@@ -1,0 +1,66 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVeterinarian() {
+      return isSignedIn()
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+             == 'veterinarian';
+    }
+
+    function isStaff() {
+      return isSignedIn()
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+             == 'staff';
+    }
+
+    // Users
+    match /users/{userId} {
+      allow read: if isSignedIn()
+                  && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    // Pets
+    match /pets/{petId} {
+      allow read, write: if isVeterinarian() || isStaff();
+    }
+
+    // Treatments
+    match /treatments/{treatmentId} {
+      allow read: if isVeterinarian() || isStaff();
+      allow create, update: if isVeterinarian();
+      allow delete: if isVeterinarian();
+    }
+
+    // Vaccinations
+    match /vaccinations/{vaccinationId} {
+      allow read: if isVeterinarian() || isStaff();
+      allow create, update: if isVeterinarian();
+      allow delete: if isVeterinarian();
+    }
+
+    // Follow-ups
+    match /followUps/{followUpId} {
+      allow read: if isVeterinarian() || isStaff();
+      allow create, update: if isVeterinarian();
+      allow delete: if isVeterinarian();
+    }
+
+    // Appointments
+    match /appointments/{appointmentId} {
+      allow read, write: if isVeterinarian() || isStaff();
+    }
+
+    // Clinics
+    match /clinics/{branchId} {
+      allow read: if isVeterinarian() || isStaff();
+      allow write: if isVeterinarian();
+    }
+  }
+}
