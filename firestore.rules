@@ -3,64 +3,142 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ------------------------------------------------------------
+    // HELPER FUNCTIONS
+    // ------------------------------------------------------------
+
     function isSignedIn() {
       return request.auth != null;
     }
 
+    function isCurrentUser(userId) {
+      return isSignedIn()
+          && request.auth.uid == userId;
+    }
+
     function isVeterinarian() {
       return isSignedIn()
-          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-             == 'veterinarian';
+          && get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.role == 'veterinarian';
     }
 
     function isStaff() {
       return isSignedIn()
-          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-             == 'staff';
+          && get(
+            /databases/$(database)/documents/users/$(request.auth.uid)
+          ).data.role == 'staff';
     }
 
-    // Users
+    // ------------------------------------------------------------
+    // USERS
+    // ------------------------------------------------------------
+
     match /users/{userId} {
-      allow read: if isSignedIn()
-                  && request.auth.uid == userId;
+
+      // A signed-in user can read only their own profile.
+      allow read: if isCurrentUser(userId);
+
+      // User profiles cannot be modified from the application.
+      // They are managed by the Firebase/backend administrator.
       allow write: if false;
     }
 
-    // Pets
+    // ------------------------------------------------------------
+    // PETS
+    // ------------------------------------------------------------
+
     match /pets/{petId} {
-      allow read, write: if isVeterinarian() || isStaff();
+
+      // Veterinarians and clinic staff can view pets.
+      allow read: if isVeterinarian() || isStaff();
+
+      // Both roles can create/update basic pet information.
+      allow create, update: if isVeterinarian() || isStaff();
+
+      // Pet deletion is disabled to protect medical history.
+      allow delete: if false;
     }
 
-    // Treatments
+    // ------------------------------------------------------------
+    // TREATMENTS
+    // ------------------------------------------------------------
+
     match /treatments/{treatmentId} {
+
+      // Veterinarians and staff can view medical history.
       allow read: if isVeterinarian() || isStaff();
+
+      // Only veterinarians can create or modify treatments.
       allow create, update: if isVeterinarian();
+
+      // Only veterinarians can delete a treatment.
       allow delete: if isVeterinarian();
     }
 
-    // Vaccinations
+    // ------------------------------------------------------------
+    // VACCINATIONS
+    // ------------------------------------------------------------
+
     match /vaccinations/{vaccinationId} {
+
+      // Veterinarians and staff can view vaccination history.
       allow read: if isVeterinarian() || isStaff();
+
+      // Only veterinarians can create or modify vaccinations.
       allow create, update: if isVeterinarian();
+
+      // Only veterinarians can delete vaccinations.
       allow delete: if isVeterinarian();
     }
 
-    // Follow-ups
+    // ------------------------------------------------------------
+    // FOLLOW-UPS
+    // ------------------------------------------------------------
+
     match /followUps/{followUpId} {
+
+      // Veterinarians and staff can view follow-ups.
       allow read: if isVeterinarian() || isStaff();
+
+      // Only veterinarians create or modify follow-ups.
       allow create, update: if isVeterinarian();
+
+      // Only veterinarians can delete follow-ups.
       allow delete: if isVeterinarian();
     }
 
-    // Appointments
+    // ------------------------------------------------------------
+    // APPOINTMENTS
+    // ------------------------------------------------------------
+
     match /appointments/{appointmentId} {
-      allow read, write: if isVeterinarian() || isStaff();
+
+      // Both roles can view appointments.
+      allow read: if isVeterinarian() || isStaff();
+
+      // Clinic staff schedules/updates appointments.
+      allow create, update: if isStaff();
+
+      // Staff can delete an appointment if required.
+      allow delete: if isStaff();
     }
 
-    // Clinics
+    // ------------------------------------------------------------
+    // CLINICS
+    // ------------------------------------------------------------
+
     match /clinics/{branchId} {
+
+      // Both roles can view clinic/branch information.
       allow read: if isVeterinarian() || isStaff();
-      allow write: if isVeterinarian();
+
+      // Clinic information is administrative data.
+      // Only veterinarians can create/update it in the application.
+      allow create, update: if isVeterinarian();
+
+      // Prevent accidental deletion of a branch.
+      allow delete: if false;
     }
   }
 }

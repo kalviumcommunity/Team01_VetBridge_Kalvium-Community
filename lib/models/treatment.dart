@@ -38,20 +38,37 @@ class Treatment {
   }
 
   factory Treatment.fromMap(Map<String, dynamic> map) {
+    final rawMedicines = map['medicines'];
+
+    final medicines = rawMedicines is List
+        ? rawMedicines
+              .whereType<Map>()
+              .map((medicine) => Map<String, dynamic>.from(medicine))
+              .toList()
+        : <Map<String, dynamic>>[];
+
     return Treatment(
-      treatmentId: map['treatmentId'] as String,
-      petId: map['petId'] as String,
-      diagnosis: map['diagnosis'] as String,
-      medicines: List<Map<String, dynamic>>.from(
-        (map['medicines'] as List).map(
-          (medicine) => Map<String, dynamic>.from(medicine),
-        ),
-      ),
-      date: (map['date'] as Timestamp).toDate(),
-      notes: map['notes'] as String,
-      branchId: map['branchId'] as String,
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
-      updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+      treatmentId: map['treatmentId'] as String? ?? '',
+      petId: map['petId'] as String? ?? '',
+      diagnosis: map['diagnosis'] as String? ?? '',
+      medicines: medicines,
+      date: _timestampToDate(map['date']),
+      notes: map['notes'] as String? ?? '',
+      branchId: map['branchId'] as String? ?? '',
+      createdAt: _timestampToDate(map['createdAt']),
+      updatedAt: _timestampToDate(map['updatedAt']),
     );
+  }
+
+  static DateTime _timestampToDate(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    return DateTime.now();
   }
 }
