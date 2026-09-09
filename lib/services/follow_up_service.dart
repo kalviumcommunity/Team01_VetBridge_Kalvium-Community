@@ -6,7 +6,7 @@ class FollowUpService {
   final FirebaseFirestore _firestore;
 
   FollowUpService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   static const String collectionName = 'followUps';
 
@@ -45,9 +45,7 @@ class FollowUpService {
     final existingFollowUp = await document.get();
 
     if (existingFollowUp.exists) {
-      throw StateError(
-        'Follow-up with ID "$followUpId" already exists.',
-      );
+      throw StateError('Follow-up with ID "$followUpId" already exists.');
     }
 
     final data = followUp.toMap();
@@ -132,9 +130,7 @@ class FollowUpService {
     final existingFollowUp = await document.get();
 
     if (!existingFollowUp.exists) {
-      throw StateError(
-        'Follow-up with ID "$id" does not exist.',
-      );
+      throw StateError('Follow-up with ID "$id" does not exist.');
     }
 
     final data = followUp.toMap();
@@ -163,18 +159,13 @@ class FollowUpService {
     final existingFollowUp = await document.get();
 
     if (!existingFollowUp.exists) {
-      throw StateError(
-        'Follow-up with ID "$id" does not exist.',
-      );
+      throw StateError('Follow-up with ID "$id" does not exist.');
     }
 
     await document.delete();
   }
 
-  Future<void> _updateStatus(
-    String followUpId,
-    String status,
-  ) async {
+  Future<void> _updateStatus(String followUpId, String status) async {
     final id = followUpId.trim();
 
     if (id.isEmpty) {
@@ -185,15 +176,10 @@ class FollowUpService {
     final existingFollowUp = await document.get();
 
     if (!existingFollowUp.exists) {
-      throw StateError(
-        'Follow-up with ID "$id" does not exist.',
-      );
+      throw StateError('Follow-up with ID "$id" does not exist.');
     }
 
-    await document.update({
-      'status': status,
-      'updatedAt': Timestamp.now(),
-    });
+    await document.update({'status': status, 'updatedAt': Timestamp.now()});
   }
 
   String _normalizeStatus(String status) {

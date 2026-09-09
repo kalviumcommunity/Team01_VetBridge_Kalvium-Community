@@ -6,7 +6,7 @@ class TreatmentService {
   final FirebaseFirestore _firestore;
 
   TreatmentService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   static const String collectionName = 'treatments';
 
@@ -31,9 +31,7 @@ class TreatmentService {
     }
 
     if (treatment.medicines.isEmpty) {
-      throw ArgumentError(
-        'At least one medicine is required for a treatment.',
-      );
+      throw ArgumentError('At least one medicine is required for a treatment.');
     }
 
     if (treatment.branchId.trim().isEmpty) {
@@ -84,9 +82,7 @@ class TreatmentService {
       return [];
     }
 
-    final snapshot = await _treatments
-        .where('petId', isEqualTo: id)
-        .get();
+    final snapshot = await _treatments.where('petId', isEqualTo: id).get();
 
     return snapshot.docs
         .map((document) => Treatment.fromMap(document.data()))
@@ -130,9 +126,7 @@ class TreatmentService {
     }
 
     if (treatment.medicines.isEmpty) {
-      throw ArgumentError(
-        'At least one medicine is required for a treatment.',
-      );
+      throw ArgumentError('At least one medicine is required for a treatment.');
     }
 
     final document = _treatments.doc(id);
@@ -140,9 +134,7 @@ class TreatmentService {
     final existingTreatment = await document.get();
 
     if (!existingTreatment.exists) {
-      throw StateError(
-        'Treatment with ID "$id" does not exist.',
-      );
+      throw StateError('Treatment with ID "$id" does not exist.');
     }
 
     await document.update(treatment.toMap());
@@ -164,9 +156,7 @@ class TreatmentService {
     final existingTreatment = await document.get();
 
     if (!existingTreatment.exists) {
-      throw StateError(
-        'Treatment with ID "$id" does not exist.',
-      );
+      throw StateError('Treatment with ID "$id" does not exist.');
     }
 
     await document.delete();

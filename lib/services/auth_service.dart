@@ -1,72 +1,33 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import '../models/user_model.dart';
 
-class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+abstract class AuthService {
+  Future<UserModel?> login(String email, String password);
 
-  static const String _usersCollection = 'users';
+  Future<void> logout();
 
-  Future<User?> signIn(String email, String password) async {
-    try {
-      final credential = await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+  UserModel? get currentUser;
 
-      return credential.user;
-    } on FirebaseAuthException {
-      rethrow;
-    }
-  }
-
-  User? get currentUser {
-    return _auth.currentUser;
-  }
+  Stream<UserModel?> get authStateChanges;
 
   Future<Map<String, dynamic>?> getCurrentUserProfile() async {
-    final user = _auth.currentUser;
-
-    if (user == null) {
-      return null;
-    }
-
-    final document = await _firestore
-        .collection(_usersCollection)
-        .doc(user.uid)
-        .get();
-
-    if (!document.exists || document.data() == null) {
-      return null;
-    }
-
-    return {
-      'uid': user.uid,
-      ...document.data()!,
-    };
+    return currentUser?.toMap();
   }
 
   Future<String?> getCurrentUserRole() async {
     final profile = await getCurrentUserProfile();
-
     return profile?['role'] as String?;
   }
 
   Future<String?> getCurrentUserBranchId() async {
     final profile = await getCurrentUserProfile();
-
     return profile?['branchId'] as String?;
   }
 
   Future<bool> isVeterinarian() async {
-    return await getCurrentUserRole() == 'veterinarian';
+    return (await getCurrentUserRole())?.toLowerCase() == 'veterinarian';
   }
 
   Future<bool> isStaff() async {
-    return await getCurrentUserRole() == 'staff';
-  }
-
-  Future<void> signOut() async {
-    await _auth.signOut();
+    return (await getCurrentUserRole())?.toLowerCase() == 'staff';
   }
 }
