@@ -9,7 +9,7 @@ void main() {
         userId: '123',
         name: 'Dr. Test',
         email: 'test@vetbridge.com',
-        role: 'Veterinarian',
+        role: 'veterinarian',
         branchId: 'branch_1',
       );
 
@@ -17,7 +17,7 @@ void main() {
       expect(map['userId'], '123');
       expect(map['name'], 'Dr. Test');
       expect(map['email'], 'test@vetbridge.com');
-      expect(map['role'], 'Veterinarian');
+      expect(map['role'], 'veterinarian');
       expect(map['branchId'], 'branch_1');
 
       final deserialized = UserModel.fromMap(map);
@@ -42,21 +42,27 @@ void main() {
     });
 
     test('login success for veterinarian', () async {
-      final user = await mockAuthService.login('vet@vetbridge.com', 'password123');
-      
+      final user = await mockAuthService.login(
+        'vet@vetbridge.com',
+        'password123',
+      );
+
       expect(user, isNotNull);
       expect(user!.email, 'vet@vetbridge.com');
-      expect(user.role, 'Veterinarian');
+      expect(user.role, 'veterinarian');
       expect(user.name, 'Dr. Ananya');
       expect(mockAuthService.currentUser, user);
     });
 
     test('login success for clinic staff', () async {
-      final user = await mockAuthService.login('staff@vetbridge.com', 'password123');
-      
+      final user = await mockAuthService.login(
+        'staff@vetbridge.com',
+        'password123',
+      );
+
       expect(user, isNotNull);
       expect(user!.email, 'staff@vetbridge.com');
-      expect(user.role, 'Clinic Staff');
+      expect(user.role, 'staff');
       expect(user.name, 'Rahul');
       expect(mockAuthService.currentUser, user);
     });
@@ -64,7 +70,13 @@ void main() {
     test('login failure with incorrect password', () async {
       expect(
         () => mockAuthService.login('vet@vetbridge.com', 'wrong_password'),
-        throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('Incorrect password'))),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('Incorrect password'),
+          ),
+        ),
       );
       expect(mockAuthService.currentUser, isNull);
     });
@@ -72,7 +84,13 @@ void main() {
     test('login failure with unknown user email', () async {
       expect(
         () => mockAuthService.login('unknown@vetbridge.com', 'password123'),
-        throwsA(isA<Exception>().having((e) => e.toString(), 'message', contains('User not found'))),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('User not found'),
+          ),
+        ),
       );
       expect(mockAuthService.currentUser, isNull);
     });
@@ -92,7 +110,7 @@ void main() {
         mockAuthService.authStateChanges,
         emitsInOrder([
           isNotNull, // Emitted on login
-          isNull,    // Emitted on logout
+          isNull, // Emitted on logout
         ]),
       );
 

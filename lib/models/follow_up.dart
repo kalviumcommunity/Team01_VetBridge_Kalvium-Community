@@ -39,15 +39,27 @@ class FollowUp {
 
   factory FollowUp.fromMap(Map<String, dynamic> map) {
     return FollowUp(
-      followUpId: map['followUpId'] as String,
-      petId: map['petId'] as String,
-      followUpDate: (map['followUpDate'] as Timestamp).toDate(),
-      reason: map['reason'] as String,
-      relatedTreatmentId: map['relatedTreatmentId'] as String,
-      status: map['status'] as String,
-      notes: map['notes'] as String,
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
-      updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+      followUpId: map['followUpId'] as String? ?? '',
+      petId: map['petId'] as String? ?? '',
+      followUpDate: _toDate(map['followUpDate']),
+      reason: map['reason'] as String? ?? '',
+      relatedTreatmentId: map['relatedTreatmentId'] as String? ?? '',
+      status: map['status'] as String? ?? 'Pending',
+      notes: map['notes'] as String? ?? '',
+      createdAt: _toDate(map['createdAt']),
+      updatedAt: _toDate(map['updatedAt']),
     );
+  }
+
+  static DateTime _toDate(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    return DateTime.now();
   }
 }

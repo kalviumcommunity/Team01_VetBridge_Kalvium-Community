@@ -39,15 +39,27 @@ class Appointment {
 
   factory Appointment.fromMap(Map<String, dynamic> map) {
     return Appointment(
-      appointmentId: map['appointmentId'] as String,
-      petId: map['petId'] as String,
-      appointmentDate: (map['appointmentDate'] as Timestamp).toDate(),
-      appointmentTime: map['appointmentTime'] as String,
-      reason: map['reason'] as String,
-      status: map['status'] as String,
-      notes: map['notes'] as String,
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
-      updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+      appointmentId: map['appointmentId'] as String? ?? '',
+      petId: map['petId'] as String? ?? '',
+      appointmentDate: _toDate(map['appointmentDate']),
+      appointmentTime: map['appointmentTime'] as String? ?? '',
+      reason: map['reason'] as String? ?? '',
+      status: map['status'] as String? ?? 'Scheduled',
+      notes: map['notes'] as String? ?? '',
+      createdAt: _toDate(map['createdAt']),
+      updatedAt: _toDate(map['updatedAt']),
     );
+  }
+
+  static DateTime _toDate(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    return DateTime.now();
   }
 }

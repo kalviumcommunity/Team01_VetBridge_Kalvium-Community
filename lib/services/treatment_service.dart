@@ -1,116 +1,164 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/treatment_model.dart';
 
-abstract class TreatmentService {
-  /// Record a new treatment & medication entry.
-  Future<TreatmentModel> addTreatment(TreatmentModel treatment);
+import '../models/treatment.dart';
 
-  /// Retrieve all treatment records for a specific pet.
-  Future<List<TreatmentModel>> getTreatments(String petId);
+class TreatmentService {
+  final FirebaseFirestore _firestore;
 
-  /// Update an existing treatment record.
-  Future<TreatmentModel> updateTreatment(TreatmentModel treatment);
-}
+  TreatmentService({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
-/// An in-memory implementation of [TreatmentService] for local testing and prototyping.
-class MockTreatmentService implements TreatmentService {
-  final List<TreatmentModel> _mockTreatments = [
-    TreatmentModel(
-      treatmentId: 'TRT_001',
-      petId: 'PET_001',
-      diagnosis: 'Ear Infection',
-      medicines: [
-        {'medicine': 'Otobiotic Drops', 'dosage': '2 drops twice daily for 7 days'}
-      ],
-      date: DateTime.now().subtract(const Duration(days: 45)),
-      notes: 'Clean ears prior to applying drops.',
-      vetId: 'mock_vet_123',
-      branchId: 'branch_east',
-      createdAt: DateTime.now().subtract(const Duration(days: 45)),
-    ),
-  ];
+  static const String collectionName = 'treatments';
 
-  @override
-  Future<TreatmentModel> addTreatment(TreatmentModel treatment) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final newTrt = TreatmentModel(
-      treatmentId: treatment.treatmentId.isEmpty
-          ? 'TRT_MOCK_${DateTime.now().millisecondsSinceEpoch}'
-          : treatment.treatmentId,
-      petId: treatment.petId,
-      diagnosis: treatment.diagnosis,
-      medicines: treatment.medicines,
-      date: treatment.date,
-      notes: treatment.notes,
-      vetId: treatment.vetId,
-      branchId: treatment.branchId,
-      createdAt: DateTime.now(),
-    );
-    _mockTreatments.add(newTrt);
-    return newTrt;
-  }
+  CollectionReference<Map<String, dynamic>> get _treatments =>
+      _firestore.collection(collectionName);
 
-  @override
-  Future<List<TreatmentModel>> getTreatments(String petId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return _mockTreatments.where((t) => t.petId == petId).toList();
-  }
+  // ------------------------------------------------------------
+  // CREATE TREATMENT
+  // ------------------------------------------------------------
 
-  @override
-  Future<TreatmentModel> updateTreatment(TreatmentModel treatment) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final index = _mockTreatments.indexWhere((t) => t.treatmentId == treatment.treatmentId);
-    if (index == -1) {
-      throw Exception('Treatment record not found with ID: ${treatment.treatmentId}');
+  Future<void> createTreatment(Treatment treatment) async {
+    if (treatment.treatmentId.trim().isEmpty) {
+      throw ArgumentError('Treatment ID cannot be empty.');
     }
-    _mockTreatments[index] = treatment;
-    return treatment;
-  }
-}
 
-/// A production-ready implementation of [TreatmentService] integrating with Cloud Firestore ('treatments' collection).
-class FirebaseTreatmentService implements TreatmentService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static const String _treatmentsCollectionPath = 'treatments';
+    if (treatment.petId.trim().isEmpty) {
+      throw ArgumentError('Pet ID cannot be empty.');
+    }
 
-  @override
-  Future<TreatmentModel> addTreatment(TreatmentModel treatment) async {
-    final docRef = treatment.treatmentId.isNotEmpty
-        ? _firestore.collection(_treatmentsCollectionPath).doc(treatment.treatmentId)
-        : _firestore.collection(_treatmentsCollectionPath).doc();
+    if (treatment.diagnosis.trim().isEmpty) {
+      throw ArgumentError('Diagnosis cannot be empty.');
+    }
 
-    final newTrt = TreatmentModel(
-      treatmentId: docRef.id,
-      petId: treatment.petId,
-      diagnosis: treatment.diagnosis,
-      medicines: treatment.medicines,
-      date: treatment.date,
-      notes: treatment.notes,
-      vetId: treatment.vetId,
-      branchId: treatment.branchId,
-      createdAt: treatment.createdAt,
-    );
+    if (treatment.medicines.isEmpty) {
+      throw ArgumentError('At least one medicine is required for a treatment.');
+    }
 
-    await docRef.set(newTrt.toMap());
-    return newTrt;
+    if (treatment.branchId.trim().isEmpty) {
+      throw ArgumentError('Branch ID cannot be empty.');
+    }
+
+    final document = _treatments.doc(treatment.treatmentId.trim());
+
+    final existingTreatment = await document.get();
+
+    if (existingTreatment.exists) {
+      throw StateError(
+        'Treatment with ID "${treatment.treatmentId}" already exists.',
+      );
+    }
+
+    await document.set(treatment.toMap());
   }
 
-  @override
-  Future<List<TreatmentModel>> getTreatments(String petId) async {
-    final snapshot = await _firestore
-        .collection(_treatmentsCollectionPath)
-        .where('petId', isEqualTo: petId)
+  // ------------------------------------------------------------
+  // GET TREATMENT BY ID
+  // ------------------------------------------------------------
+
+  Future<Treatment?> getTreatment(String treatmentId) async {
+    final id = treatmentId.trim();
+
+    if (id.isEmpty) {
+      return null;
+    }
+
+    final document = await _treatments.doc(id).get();
+
+    if (!document.exists || document.data() == null) {
+      return null;
+    }
+
+    return Treatment.fromMap(document.data()!);
+  }
+
+  // ------------------------------------------------------------
+  // GET ALL TREATMENTS FOR A PET
+  // ------------------------------------------------------------
+
+  Future<List<Treatment>> getTreatmentsByPet(String petId) async {
+    final id = petId.trim();
+
+    if (id.isEmpty) {
+      return [];
+    }
+
+    final snapshot = await _treatments.where('petId', isEqualTo: id).get();
+
+    return snapshot.docs
+        .map((document) => Treatment.fromMap(document.data()))
+        .toList();
+  }
+
+  // ------------------------------------------------------------
+  // GET TREATMENT HISTORY FOR A PET
+  // ------------------------------------------------------------
+
+  Future<List<Treatment>> getTreatmentHistory(String petId) async {
+    final id = petId.trim();
+
+    if (id.isEmpty) {
+      return [];
+    }
+
+    final snapshot = await _treatments
+        .where('petId', isEqualTo: id)
+        .orderBy('date', descending: true)
         .get();
 
-    return snapshot.docs.map((doc) => TreatmentModel.fromMap(doc.data())).toList();
+    return snapshot.docs
+        .map((document) => Treatment.fromMap(document.data()))
+        .toList();
   }
 
-  @override
-  Future<TreatmentModel> updateTreatment(TreatmentModel treatment) async {
-    await _firestore
-        .collection(_treatmentsCollectionPath)
-        .doc(treatment.treatmentId)
-        .update(treatment.toMap());
-    return treatment;
+  // ------------------------------------------------------------
+  // UPDATE TREATMENT
+  // ------------------------------------------------------------
+
+  Future<void> updateTreatment(Treatment treatment) async {
+    final id = treatment.treatmentId.trim();
+
+    if (id.isEmpty) {
+      throw ArgumentError('Treatment ID cannot be empty.');
+    }
+
+    if (treatment.diagnosis.trim().isEmpty) {
+      throw ArgumentError('Diagnosis cannot be empty.');
+    }
+
+    if (treatment.medicines.isEmpty) {
+      throw ArgumentError('At least one medicine is required for a treatment.');
+    }
+
+    final document = _treatments.doc(id);
+
+    final existingTreatment = await document.get();
+
+    if (!existingTreatment.exists) {
+      throw StateError('Treatment with ID "$id" does not exist.');
+    }
+
+    await document.update(treatment.toMap());
+  }
+
+  // ------------------------------------------------------------
+  // DELETE TREATMENT
+  // ------------------------------------------------------------
+
+  Future<void> deleteTreatment(String treatmentId) async {
+    final id = treatmentId.trim();
+
+    if (id.isEmpty) {
+      throw ArgumentError('Treatment ID cannot be empty.');
+    }
+
+    final document = _treatments.doc(id);
+
+    final existingTreatment = await document.get();
+
+    if (!existingTreatment.exists) {
+      throw StateError('Treatment with ID "$id" does not exist.');
+    }
+
+    await document.delete();
   }
 }

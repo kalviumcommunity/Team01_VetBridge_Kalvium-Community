@@ -1,15 +1,33 @@
 import '../models/user_model.dart';
 
 abstract class AuthService {
-  /// Sign in user with email and password.
   Future<UserModel?> login(String email, String password);
 
-  /// Sign out the current user.
   Future<void> logout();
 
-  /// Get the currently logged in user profile.
   UserModel? get currentUser;
 
-  /// Stream of authentication state changes.
   Stream<UserModel?> get authStateChanges;
+
+  Future<Map<String, dynamic>?> getCurrentUserProfile() async {
+    return currentUser?.toMap();
+  }
+
+  Future<String?> getCurrentUserRole() async {
+    final profile = await getCurrentUserProfile();
+    return profile?['role'] as String?;
+  }
+
+  Future<String?> getCurrentUserBranchId() async {
+    final profile = await getCurrentUserProfile();
+    return profile?['branchId'] as String?;
+  }
+
+  Future<bool> isVeterinarian() async {
+    return (await getCurrentUserRole())?.toLowerCase() == 'veterinarian';
+  }
+
+  Future<bool> isStaff() async {
+    return (await getCurrentUserRole())?.toLowerCase() == 'staff';
+  }
 }

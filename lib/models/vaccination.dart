@@ -39,15 +39,27 @@ class Vaccination {
 
   factory Vaccination.fromMap(Map<String, dynamic> map) {
     return Vaccination(
-      vaccinationId: map['vaccinationId'] as String,
-      petId: map['petId'] as String,
-      vaccine: map['vaccine'] as String,
-      date: (map['date'] as Timestamp).toDate(),
-      nextDueDate: (map['nextDueDate'] as Timestamp).toDate(),
-      notes: map['notes'] as String,
-      branchId: map['branchId'] as String,
-      createdAt: (map['createdAt'] as Timestamp).toDate(),
-      updatedAt: (map['updatedAt'] as Timestamp).toDate(),
+      vaccinationId: map['vaccinationId'] as String? ?? '',
+      petId: map['petId'] as String? ?? '',
+      vaccine: map['vaccine'] as String? ?? '',
+      date: _timestampToDate(map['date']),
+      nextDueDate: _timestampToDate(map['nextDueDate']),
+      notes: map['notes'] as String? ?? '',
+      branchId: map['branchId'] as String? ?? '',
+      createdAt: _timestampToDate(map['createdAt']),
+      updatedAt: _timestampToDate(map['updatedAt']),
     );
+  }
+
+  static DateTime _timestampToDate(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    return DateTime.now();
   }
 }
