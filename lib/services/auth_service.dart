@@ -7,10 +7,6 @@ class AuthService {
 
   static const String _usersCollection = 'users';
 
-  // ------------------------------------------------------------
-  // SIGN IN
-  // ------------------------------------------------------------
-
   Future<User?> signIn(String email, String password) async {
     try {
       final credential = await _auth.signInWithEmailAndPassword(
@@ -24,17 +20,9 @@ class AuthService {
     }
   }
 
-  // ------------------------------------------------------------
-  // GET CURRENT FIREBASE USER
-  // ------------------------------------------------------------
-
   User? get currentUser {
     return _auth.currentUser;
   }
-
-  // ------------------------------------------------------------
-  // GET CURRENT USER PROFILE
-  // ------------------------------------------------------------
 
   Future<Map<String, dynamic>?> getCurrentUserProfile() async {
     final user = _auth.currentUser;
@@ -52,56 +40,31 @@ class AuthService {
       return null;
     }
 
-    return {'uid': user.uid, ...document.data()!};
+    return {
+      'uid': user.uid,
+      ...document.data()!,
+    };
   }
-
-  // ------------------------------------------------------------
-  // GET CURRENT USER ROLE
-  // ------------------------------------------------------------
 
   Future<String?> getCurrentUserRole() async {
     final profile = await getCurrentUserProfile();
 
-    if (profile == null) {
-      return null;
-    }
-
-    return profile['role'] as String?;
+    return profile?['role'] as String?;
   }
-
-  // ------------------------------------------------------------
-  // GET CURRENT USER BRANCH
-  // ------------------------------------------------------------
 
   Future<String?> getCurrentUserBranchId() async {
     final profile = await getCurrentUserProfile();
 
-    if (profile == null) {
-      return null;
-    }
-
-    return profile['branchId'] as String?;
+    return profile?['branchId'] as String?;
   }
 
-  // ------------------------------------------------------------
-  // CHECK ROLE
-  // ------------------------------------------------------------
-
   Future<bool> isVeterinarian() async {
-    final role = await getCurrentUserRole();
-
-    return role == 'veterinarian';
+    return await getCurrentUserRole() == 'veterinarian';
   }
 
   Future<bool> isStaff() async {
-    final role = await getCurrentUserRole();
-
-    return role == 'staff';
+    return await getCurrentUserRole() == 'staff';
   }
-
-  // ------------------------------------------------------------
-  // SIGN OUT
-  // ------------------------------------------------------------
 
   Future<void> signOut() async {
     await _auth.signOut();

@@ -6,7 +6,7 @@ class VaccinationService {
   final FirebaseFirestore _firestore;
 
   VaccinationService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   static const String collectionName = 'vaccinations';
 
@@ -40,7 +40,9 @@ class VaccinationService {
     }
 
     if (vaccination.nextDueDate.isBefore(vaccination.date)) {
-      throw ArgumentError('Next due date cannot be before vaccination date.');
+      throw ArgumentError(
+        'Next due date cannot be before vaccination date.',
+      );
     }
 
     final document = _vaccinations.doc(vaccinationId);
@@ -48,7 +50,9 @@ class VaccinationService {
     final existingVaccination = await document.get();
 
     if (existingVaccination.exists) {
-      throw StateError('Vaccination with ID "$vaccinationId" already exists.');
+      throw StateError(
+        'Vaccination with ID "$vaccinationId" already exists.',
+      );
     }
 
     await document.set(vaccination.toMap());
@@ -85,7 +89,9 @@ class VaccinationService {
       return [];
     }
 
-    final snapshot = await _vaccinations.where('petId', isEqualTo: id).get();
+    final snapshot = await _vaccinations
+        .where('petId', isEqualTo: id)
+        .get();
 
     return snapshot.docs
         .map((document) => Vaccination.fromMap(document.data()))
@@ -154,7 +160,9 @@ class VaccinationService {
     }
 
     if (vaccination.nextDueDate.isBefore(vaccination.date)) {
-      throw ArgumentError('Next due date cannot be before vaccination date.');
+      throw ArgumentError(
+        'Next due date cannot be before vaccination date.',
+      );
     }
 
     final document = _vaccinations.doc(vaccinationId);
@@ -162,7 +170,9 @@ class VaccinationService {
     final existingVaccination = await document.get();
 
     if (!existingVaccination.exists) {
-      throw StateError('Vaccination with ID "$vaccinationId" does not exist.');
+      throw StateError(
+        'Vaccination with ID "$vaccinationId" does not exist.',
+      );
     }
 
     await document.update(vaccination.toMap());
@@ -184,7 +194,9 @@ class VaccinationService {
     final existingVaccination = await document.get();
 
     if (!existingVaccination.exists) {
-      throw StateError('Vaccination with ID "$id" does not exist.');
+      throw StateError(
+        'Vaccination with ID "$id" does not exist.',
+      );
     }
 
     await document.delete();

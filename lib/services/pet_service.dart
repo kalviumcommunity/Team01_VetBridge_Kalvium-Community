@@ -6,7 +6,7 @@ class PetService {
   final FirebaseFirestore _firestore;
 
   PetService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   static const String collectionName = 'pets';
 
@@ -88,7 +88,9 @@ class PetService {
       return [];
     }
 
-    final snapshot = await _pets.where('name', isEqualTo: searchName).get();
+    final snapshot = await _pets
+        .where('name', isEqualTo: searchName)
+        .get();
 
     return snapshot.docs
         .map((document) => Pet.fromMap(document.data()))

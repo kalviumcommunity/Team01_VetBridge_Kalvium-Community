@@ -6,7 +6,7 @@ class FollowUpService {
   final FirebaseFirestore _firestore;
 
   FollowUpService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   static const String collectionName = 'followUps';
 
@@ -15,10 +15,6 @@ class FollowUpService {
 
   CollectionReference<Map<String, dynamic>> get _followUps =>
       _firestore.collection(collectionName);
-
-  // ------------------------------------------------------------
-  // CREATE FOLLOW-UP
-  // ------------------------------------------------------------
 
   Future<void> createFollowUp(FollowUp followUp) async {
     final followUpId = followUp.followUpId.trim();
@@ -44,13 +40,14 @@ class FollowUpService {
     }
 
     final status = _normalizeStatus(followUp.status);
-
     final document = _followUps.doc(followUpId);
 
     final existingFollowUp = await document.get();
 
     if (existingFollowUp.exists) {
-      throw StateError('Follow-up with ID "$followUpId" already exists.');
+      throw StateError(
+        'Follow-up with ID "$followUpId" already exists.',
+      );
     }
 
     final data = followUp.toMap();
@@ -58,10 +55,6 @@ class FollowUpService {
 
     await document.set(data);
   }
-
-  // ------------------------------------------------------------
-  // GET FOLLOW-UP BY ID
-  // ------------------------------------------------------------
 
   Future<FollowUp?> getFollowUp(String followUpId) async {
     final id = followUpId.trim();
@@ -78,10 +71,6 @@ class FollowUpService {
 
     return FollowUp.fromMap(document.data()!);
   }
-
-  // ------------------------------------------------------------
-  // GET FOLLOW-UPS FOR A PET
-  // ------------------------------------------------------------
 
   Future<List<FollowUp>> getFollowUpsByPet(String petId) async {
     final id = petId.trim();
@@ -100,10 +89,6 @@ class FollowUpService {
         .toList();
   }
 
-  // ------------------------------------------------------------
-  // GET PENDING FOLLOW-UPS
-  // ------------------------------------------------------------
-
   Future<List<FollowUp>> getPendingFollowUps() async {
     final snapshot = await _followUps
         .where('status', isEqualTo: pending)
@@ -115,10 +100,6 @@ class FollowUpService {
         .toList();
   }
 
-  // ------------------------------------------------------------
-  // GET COMPLETED FOLLOW-UPS
-  // ------------------------------------------------------------
-
   Future<List<FollowUp>> getCompletedFollowUps() async {
     final snapshot = await _followUps
         .where('status', isEqualTo: completed)
@@ -129,10 +110,6 @@ class FollowUpService {
         .map((document) => FollowUp.fromMap(document.data()))
         .toList();
   }
-
-  // ------------------------------------------------------------
-  // UPDATE FOLLOW-UP
-  // ------------------------------------------------------------
 
   Future<void> updateFollowUp(FollowUp followUp) async {
     final id = followUp.followUpId.trim();
@@ -150,68 +127,30 @@ class FollowUpService {
     }
 
     final status = _normalizeStatus(followUp.status);
-
     final document = _followUps.doc(id);
 
     final existingFollowUp = await document.get();
 
     if (!existingFollowUp.exists) {
-      throw StateError('Follow-up with ID "$id" does not exist.');
+      throw StateError(
+        'Follow-up with ID "$id" does not exist.',
+      );
     }
 
     final data = followUp.toMap();
     data['status'] = status;
+    data['updatedAt'] = Timestamp.now();
 
     await document.update(data);
   }
 
-  // ------------------------------------------------------------
-  // MARK FOLLOW-UP AS COMPLETED
-  // ------------------------------------------------------------
-
   Future<void> markAsCompleted(String followUpId) async {
-    final id = followUpId.trim();
-
-    if (id.isEmpty) {
-      throw ArgumentError('Follow-up ID cannot be empty.');
-    }
-
-    final document = _followUps.doc(id);
-
-    final existingFollowUp = await document.get();
-
-    if (!existingFollowUp.exists) {
-      throw StateError('Follow-up with ID "$id" does not exist.');
-    }
-
-    await document.update({'status': completed, 'updatedAt': Timestamp.now()});
+    await _updateStatus(followUpId, completed);
   }
-
-  // ------------------------------------------------------------
-  // MARK FOLLOW-UP AS PENDING
-  // ------------------------------------------------------------
 
   Future<void> markAsPending(String followUpId) async {
-    final id = followUpId.trim();
-
-    if (id.isEmpty) {
-      throw ArgumentError('Follow-up ID cannot be empty.');
-    }
-
-    final document = _followUps.doc(id);
-
-    final existingFollowUp = await document.get();
-
-    if (!existingFollowUp.exists) {
-      throw StateError('Follow-up with ID "$id" does not exist.');
-    }
-
-    await document.update({'status': pending, 'updatedAt': Timestamp.now()});
+    await _updateStatus(followUpId, pending);
   }
-
-  // ------------------------------------------------------------
-  // DELETE FOLLOW-UP
-  // ------------------------------------------------------------
 
   Future<void> deleteFollowUp(String followUpId) async {
     final id = followUpId.trim();
@@ -221,29 +160,47 @@ class FollowUpService {
     }
 
     final document = _followUps.doc(id);
-
     final existingFollowUp = await document.get();
 
     if (!existingFollowUp.exists) {
-      throw StateError('Follow-up with ID "$id" does not exist.');
+      throw StateError(
+        'Follow-up with ID "$id" does not exist.',
+      );
     }
 
     await document.delete();
   }
 
-  // ------------------------------------------------------------
-  // VALIDATE STATUS
-  // ------------------------------------------------------------
+  Future<void> _updateStatus(
+    String followUpId,
+    String status,
+  ) async {
+    final id = followUpId.trim();
+
+    if (id.isEmpty) {
+      throw ArgumentError('Follow-up ID cannot be empty.');
+    }
+
+    final document = _followUps.doc(id);
+    final existingFollowUp = await document.get();
+
+    if (!existingFollowUp.exists) {
+      throw StateError(
+        'Follow-up with ID "$id" does not exist.',
+      );
+    }
+
+    await document.update({
+      'status': status,
+      'updatedAt': Timestamp.now(),
+    });
+  }
 
   String _normalizeStatus(String status) {
     final normalized = status.trim();
 
-    if (normalized == pending) {
-      return pending;
-    }
-
-    if (normalized == completed) {
-      return completed;
+    if (normalized == pending || normalized == completed) {
+      return normalized;
     }
 
     throw ArgumentError(
