@@ -56,3 +56,55 @@ class UserModel {
         branchId.hashCode;
   }
 }
+
+/// User profile shape shared by authentication and future Firestore storage.
+class AppUser {
+  const AppUser({
+    required this.uid,
+    required this.fullName,
+    required this.email,
+    required this.phone,
+    required this.clinicId,
+    required this.branchId,
+    required this.role,
+    required this.createdAt,
+  });
+
+  final String uid;
+  final String fullName;
+  final String email;
+  final String phone;
+  final String clinicId;
+  final String branchId;
+  final String role;
+  final DateTime createdAt;
+
+  factory AppUser.fromMap(Map<String, dynamic> map) {
+    final createdAt = map['createdAt'];
+    return AppUser(
+      uid: map['uid'] as String? ?? '',
+      fullName: map['fullName'] as String? ?? '',
+      email: map['email'] as String? ?? '',
+      phone: map['phone'] as String? ?? '',
+      clinicId: map['clinicId'] as String? ?? '',
+      branchId: map['branchId'] as String? ?? '',
+      role: map['role'] as String? ?? 'staff',
+      createdAt: createdAt is DateTime
+          ? createdAt
+          : DateTime.tryParse(createdAt as String? ?? '') ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'uid': uid,
+      'fullName': fullName,
+      'email': email,
+      'phone': phone,
+      'clinicId': clinicId,
+      'branchId': branchId,
+      'role': role,
+      'createdAt': createdAt.toIso8601String(),
+    };
+  }
+}

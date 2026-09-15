@@ -1,13 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
-import 'auth_service.dart';
 
-class FirebaseAuthService implements AuthService {
+class FirebaseAuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  @override
   UserModel? get currentUser {
     final User? firebaseUser = _firebaseAuth.currentUser;
     if (firebaseUser == null) return null;
@@ -15,7 +13,6 @@ class FirebaseAuthService implements AuthService {
     return _mapFirebaseUserToUserModel(firebaseUser);
   }
 
-  @override
   Stream<UserModel?> get authStateChanges {
     return _firebaseAuth.authStateChanges().asyncMap((User? firebaseUser) async {
       if (firebaseUser == null) return null;
@@ -38,7 +35,6 @@ class FirebaseAuthService implements AuthService {
     return null;
   }
 
-  @override
   Future<UserModel?> login(String email, String password) async {
     try {
       final UserCredential userCredential = await _firebaseAuth.signInWithEmailAndPassword(
@@ -80,7 +76,6 @@ class FirebaseAuthService implements AuthService {
     }
   }
 
-  @override
   Future<void> logout() async {
     await _firebaseAuth.signOut();
   }

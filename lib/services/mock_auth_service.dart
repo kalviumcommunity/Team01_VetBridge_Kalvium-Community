@@ -1,8 +1,6 @@
 import 'dart:async';
 import '../models/user_model.dart';
-import 'auth_service.dart';
-
-class MockAuthService implements AuthService {
+class MockAuthService {
   final StreamController<UserModel?> _authStateController = StreamController<UserModel?>.broadcast();
   UserModel? _currentUser;
 
@@ -29,13 +27,10 @@ class MockAuthService implements AuthService {
     _authStateController.add(null);
   }
 
-  @override
   UserModel? get currentUser => _currentUser;
 
-  @override
   Stream<UserModel?> get authStateChanges => _authStateController.stream;
 
-  @override
   Future<UserModel?> login(String email, String password) async {
     // Simulate network delay
     await Future.delayed(const Duration(milliseconds: 800));
@@ -54,7 +49,6 @@ class MockAuthService implements AuthService {
     return _currentUser;
   }
 
-  @override
   Future<void> logout() async {
     // Simulate network delay
     await Future.delayed(const Duration(milliseconds: 400));
