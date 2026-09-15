@@ -95,7 +95,8 @@ class AuthService {
     _currentUser = null;
   }
 
-  Future<void> _delay() => Future<void>.delayed(const Duration(milliseconds: 900));
+  Future<void> _delay() =>
+      Future<void>.delayed(const Duration(milliseconds: 900));
 }
 
 class _FakeAccount {

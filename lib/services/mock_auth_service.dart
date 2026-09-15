@@ -1,7 +1,10 @@
 import 'dart:async';
+
 import '../models/user_model.dart';
+
 class MockAuthService {
-  final StreamController<UserModel?> _authStateController = StreamController<UserModel?>.broadcast();
+  final StreamController<UserModel?> _authStateController =
+      StreamController<UserModel?>.broadcast();
   UserModel? _currentUser;
 
   // Mock database of users
