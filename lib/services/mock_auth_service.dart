@@ -1,9 +1,8 @@
 import 'dart:async';
 
 import '../models/user_model.dart';
-import 'auth_service.dart';
 
-class MockAuthService implements AuthService {
+class MockAuthService {
   final StreamController<UserModel?> _authStateController =
       StreamController<UserModel?>.broadcast();
   UserModel? _currentUser;
@@ -14,14 +13,14 @@ class MockAuthService implements AuthService {
       userId: 'mock_vet_123',
       name: 'Dr. Ananya',
       email: 'vet@vetbridge.com',
-      role: 'veterinarian',
+      role: 'Veterinarian',
       branchId: 'branch_east',
     ),
     UserModel(
       userId: 'mock_staff_456',
       name: 'Rahul',
       email: 'staff@vetbridge.com',
-      role: 'staff',
+      role: 'Clinic Staff',
       branchId: 'branch_west',
     ),
   ];
@@ -31,13 +30,10 @@ class MockAuthService implements AuthService {
     _authStateController.add(null);
   }
 
-  @override
   UserModel? get currentUser => _currentUser;
 
-  @override
   Stream<UserModel?> get authStateChanges => _authStateController.stream;
 
-  @override
   Future<UserModel?> login(String email, String password) async {
     // Simulate network delay
     await Future.delayed(const Duration(milliseconds: 800));
@@ -56,36 +52,10 @@ class MockAuthService implements AuthService {
     return _currentUser;
   }
 
-  @override
   Future<void> logout() async {
     // Simulate network delay
     await Future.delayed(const Duration(milliseconds: 400));
     _currentUser = null;
     _authStateController.add(null);
-  }
-
-  @override
-  Future<Map<String, dynamic>?> getCurrentUserProfile() async {
-    return _currentUser?.toMap();
-  }
-
-  @override
-  Future<String?> getCurrentUserRole() async {
-    return _currentUser?.role;
-  }
-
-  @override
-  Future<String?> getCurrentUserBranchId() async {
-    return _currentUser?.branchId;
-  }
-
-  @override
-  Future<bool> isVeterinarian() async {
-    return _currentUser?.role.toLowerCase() == 'veterinarian';
-  }
-
-  @override
-  Future<bool> isStaff() async {
-    return _currentUser?.role.toLowerCase() == 'staff';
   }
 }
