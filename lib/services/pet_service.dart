@@ -1,175 +1,172 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/pet_model.dart';
 
-abstract class PetService {
-  /// Register a new pet record.
-  Future<PetModel> createPet(PetModel pet);
+import '../models/pet.dart';
 
-  /// Retrieve a pet record by its unique ID.
-  Future<PetModel?> getPet(String petId);
+class PetService {
+  final FirebaseFirestore _firestore;
 
-  /// Search for pets by ID or Name (case-insensitive).
-  Future<List<PetModel>> searchPets(String query);
+  PetService({FirebaseFirestore? firestore})
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  /// Update an existing pet record.
-  Future<PetModel> updatePet(PetModel pet);
-}
+  static const String collectionName = 'pets';
 
-/// An in-memory implementation of [PetService] for local testing and UI prototyping.
-class MockPetService implements PetService {
-  final List<PetModel> _mockPets = [
-    PetModel(
-      petId: 'PET_001',
-      name: 'Buddy',
-      species: 'Dog',
-      breed: 'Golden Retriever',
-      dateOfBirth: DateTime(2021, 5, 10),
-      ownerName: 'Alice Smith',
-      ownerContact: '+1234567890',
-      createdAt: DateTime.now().subtract(const Duration(days: 100)),
-    ),
-    PetModel(
-      petId: 'PET_002',
-      name: 'Luna',
-      species: 'Cat',
-      breed: 'Siamese',
-      dateOfBirth: null, // Unknown DOB
-      ownerName: 'Bob Jones',
-      ownerContact: '+1987654321',
-      createdAt: DateTime.now().subtract(const Duration(days: 50)),
-    ),
-  ];
+  CollectionReference<Map<String, dynamic>> get _pets =>
+      _firestore.collection(collectionName);
 
-  @override
-  Future<PetModel> createPet(PetModel pet) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final newPet = PetModel(
-      petId: pet.petId.isEmpty ? 'PET_MOCK_${DateTime.now().millisecondsSinceEpoch}' : pet.petId,
-      name: pet.name,
-      species: pet.species,
-      breed: pet.breed,
-      gender: pet.gender,
-      dateOfBirth: pet.dateOfBirth,
-      color: pet.color,
-      weight: pet.weight,
-      microchipId: pet.microchipId,
-      ownerName: pet.ownerName,
-      ownerContact: pet.ownerContact,
-      ownerPhone: pet.ownerPhone,
-      ownerEmail: pet.ownerEmail,
-      ownerAddress: pet.ownerAddress,
-      createdAt: DateTime.now(),
-    );
-    _mockPets.add(newPet);
-    return newPet;
+  // ------------------------------------------------------------
+  // CREATE PET
+  // ------------------------------------------------------------
+
+  Future<void> createPet(Pet pet) async {
+    final petId = pet.petId.trim();
+
+    if (petId.isEmpty) {
+      throw ArgumentError('Pet ID cannot be empty.');
+    }
+
+    final document = _pets.doc(petId);
+
+    final existingPet = await document.get();
+
+    if (existingPet.exists) {
+      throw StateError('A pet with ID "$petId" already exists.');
+    }
+
+    await document.set(pet.toMap());
   }
 
-  @override
-  Future<PetModel?> getPet(String petId) async {
-    await Future.delayed(const Duration(milliseconds: 300));
-    try {
-      return _mockPets.firstWhere((p) => p.petId == petId);
-    } catch (_) {
+  // ------------------------------------------------------------
+  // GET PET BY PET ID
+  // ------------------------------------------------------------
+
+  Future<Pet?> getPet(String petId) async {
+    final id = petId.trim();
+
+    if (id.isEmpty) {
       return null;
     }
+
+    final document = await _pets.doc(id).get();
+
+    if (!document.exists || document.data() == null) {
+      return null;
+    }
+
+    return Pet.fromMap(document.data()!);
   }
 
-  @override
-  Future<List<PetModel>> searchPets(String query) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (query.trim().isEmpty) return List.from(_mockPets);
+  // ------------------------------------------------------------
+  // UPDATE PET
+  // ------------------------------------------------------------
 
-    final lowercaseQuery = query.toLowerCase().trim();
-    return _mockPets
-        .where((p) =>
-            p.petId.toLowerCase().contains(lowercaseQuery) ||
-            p.name.toLowerCase().contains(lowercaseQuery))
+  Future<void> updatePet(Pet pet) async {
+    final petId = pet.petId.trim();
+
+    if (petId.isEmpty) {
+      throw ArgumentError('Pet ID cannot be empty.');
+    }
+
+    final document = _pets.doc(petId);
+
+    final existingPet = await document.get();
+
+    if (!existingPet.exists) {
+      throw StateError('Pet with ID "$petId" does not exist.');
+    }
+
+    await document.update(pet.toMap());
+  }
+
+  // ------------------------------------------------------------
+  // SEARCH BY PET NAME
+  // ------------------------------------------------------------
+
+  Future<List<Pet>> searchPetsByName(String name) async {
+    final searchName = name.trim();
+
+    if (searchName.isEmpty) {
+      return [];
+    }
+
+    final snapshot = await _pets.where('name', isEqualTo: searchName).get();
+
+    return snapshot.docs
+        .map((document) => Pet.fromMap(document.data()))
         .toList();
   }
 
-  @override
-  Future<PetModel> updatePet(PetModel pet) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    final index = _mockPets.indexWhere((p) => p.petId == pet.petId);
-    if (index == -1) {
-      throw Exception('Pet not found with ID: ${pet.petId}');
-    }
-    _mockPets[index] = pet;
-    return pet;
-  }
-}
+  // ------------------------------------------------------------
+  // SEARCH BY OWNER NAME
+  // ------------------------------------------------------------
 
-/// A production-ready implementation of [PetService] integrating with Cloud Firestore ('pets' collection).
-class FirebasePetService implements PetService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static const String _petsCollectionPath = 'pets';
+  Future<List<Pet>> searchPetsByOwnerName(String ownerName) async {
+    final searchName = ownerName.trim();
 
-  @override
-  Future<PetModel> createPet(PetModel pet) async {
-    final docRef = pet.petId.isNotEmpty
-        ? _firestore.collection(_petsCollectionPath).doc(pet.petId)
-        : _firestore.collection(_petsCollectionPath).doc();
-
-    final newPet = PetModel(
-      petId: docRef.id,
-      name: pet.name,
-      species: pet.species,
-      breed: pet.breed,
-      gender: pet.gender,
-      dateOfBirth: pet.dateOfBirth,
-      color: pet.color,
-      weight: pet.weight,
-      microchipId: pet.microchipId,
-      ownerName: pet.ownerName,
-      ownerContact: pet.ownerContact,
-      ownerPhone: pet.ownerPhone,
-      ownerEmail: pet.ownerEmail,
-      ownerAddress: pet.ownerAddress,
-      createdAt: pet.createdAt,
-    );
-
-    await docRef.set(newPet.toMap());
-    return newPet;
-  }
-
-  @override
-  Future<PetModel?> getPet(String petId) async {
-    final doc = await _firestore.collection(_petsCollectionPath).doc(petId).get();
-    if (!doc.exists || doc.data() == null) {
-      return null;
-    }
-    return PetModel.fromMap(doc.data()!);
-  }
-
-  @override
-  Future<List<PetModel>> searchPets(String query) async {
-    final trimmed = query.trim();
-    if (trimmed.isEmpty) {
-      final snapshot = await _firestore.collection(_petsCollectionPath).get();
-      return snapshot.docs.map((doc) => PetModel.fromMap(doc.data())).toList();
+    if (searchName.isEmpty) {
+      return [];
     }
 
-    // Try finding by exact petId match first
-    final idDoc = await _firestore.collection(_petsCollectionPath).doc(trimmed).get();
-    if (idDoc.exists && idDoc.data() != null) {
-      return [PetModel.fromMap(idDoc.data()!)];
-    }
-
-    // Fallback: search by pet name
-    final snapshot = await _firestore
-        .collection(_petsCollectionPath)
-        .where('name', isEqualTo: trimmed)
+    final snapshot = await _pets
+        .where('ownerName', isEqualTo: searchName)
         .get();
 
-    return snapshot.docs.map((doc) => PetModel.fromMap(doc.data())).toList();
+    return snapshot.docs
+        .map((document) => Pet.fromMap(document.data()))
+        .toList();
   }
 
-  @override
-  Future<PetModel> updatePet(PetModel pet) async {
-    await _firestore
-        .collection(_petsCollectionPath)
-        .doc(pet.petId)
-        .update(pet.toMap());
-    return pet;
+  // ------------------------------------------------------------
+  // SEARCH BY OWNER PHONE
+  // ------------------------------------------------------------
+
+  Future<List<Pet>> searchPetsByOwnerPhone(String phone) async {
+    final searchPhone = phone.trim();
+
+    if (searchPhone.isEmpty) {
+      return [];
+    }
+
+    final snapshot = await _pets
+        .where('ownerPhone', isEqualTo: searchPhone)
+        .get();
+
+    return snapshot.docs
+        .map((document) => Pet.fromMap(document.data()))
+        .toList();
+  }
+
+  // ------------------------------------------------------------
+  // SEARCH BY MICROCHIP ID
+  // ------------------------------------------------------------
+
+  Future<Pet?> getPetByMicrochipId(String microchipId) async {
+    final chipId = microchipId.trim();
+
+    if (chipId.isEmpty) {
+      return null;
+    }
+
+    final snapshot = await _pets
+        .where('microchipId', isEqualTo: chipId)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isEmpty) {
+      return null;
+    }
+
+    return Pet.fromMap(snapshot.docs.first.data());
+  }
+
+  // ------------------------------------------------------------
+  // GET ALL PETS
+  // ------------------------------------------------------------
+
+  Future<List<Pet>> getAllPets() async {
+    final snapshot = await _pets.get();
+
+    return snapshot.docs
+        .map((document) => Pet.fromMap(document.data()))
+        .toList();
   }
 }

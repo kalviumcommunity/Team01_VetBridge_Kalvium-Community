@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../models/user_model.dart';
 
 class FirebaseAuthService {
@@ -14,9 +15,12 @@ class FirebaseAuthService {
   }
 
   Stream<UserModel?> get authStateChanges {
-    return _firebaseAuth.authStateChanges().asyncMap((User? firebaseUser) async {
+    return _firebaseAuth.authStateChanges().asyncMap((
+      User? firebaseUser,
+    ) async {
       if (firebaseUser == null) return null;
-      return await getUserProfile(firebaseUser.uid) ?? _mapFirebaseUserToUserModel(firebaseUser);
+      return await getUserProfile(firebaseUser.uid) ??
+          _mapFirebaseUserToUserModel(firebaseUser);
     });
   }
 
@@ -37,10 +41,8 @@ class FirebaseAuthService {
 
   Future<UserModel?> login(String email, String password) async {
     try {
-      final UserCredential userCredential = await _firebaseAuth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final UserCredential userCredential = await _firebaseAuth
+          .signInWithEmailAndPassword(email: email.trim(), password: password);
 
       final User? firebaseUser = userCredential.user;
       if (firebaseUser == null) {
@@ -51,7 +53,7 @@ class FirebaseAuthService {
       return profile ?? _mapFirebaseUserToUserModel(firebaseUser);
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'An error occurred during authentication.';
-      
+
       switch (e.code) {
         case 'user-not-found':
           errorMessage = 'No user found for that email.';
@@ -69,7 +71,7 @@ class FirebaseAuthService {
           errorMessage = 'Too many requests. Try again later.';
           break;
       }
-      
+
       throw Exception(errorMessage);
     } catch (e) {
       throw Exception('An unexpected error occurred: ${e.toString()}');
@@ -80,10 +82,45 @@ class FirebaseAuthService {
     await _firebaseAuth.signOut();
   }
 
+  @override
+  Future<Map<String, dynamic>?> getCurrentUserProfile() async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) {
+      return null;
+    }
+
+    final profile = await getUserProfile(user.uid);
+    return profile?.toMap();
+  }
+
+  @override
+  Future<String?> getCurrentUserRole() async {
+    final profile = await getCurrentUserProfile();
+    return profile?['role'] as String?;
+  }
+
+  @override
+  Future<String?> getCurrentUserBranchId() async {
+    final profile = await getCurrentUserProfile();
+    return profile?['branchId'] as String?;
+  }
+
+  @override
+  Future<bool> isVeterinarian() async {
+    return (await getCurrentUserRole())?.toLowerCase() == 'veterinarian';
+  }
+
+  @override
+  Future<bool> isStaff() async {
+    return (await getCurrentUserRole())?.toLowerCase() == 'staff';
+  }
+
   /// Maps a Firebase [User] to [UserModel] with fallback defaults.
   UserModel _mapFirebaseUserToUserModel(User firebaseUser) {
     final email = firebaseUser.email ?? '';
-    final namePlaceholder = firebaseUser.displayName ?? (email.isNotEmpty ? email.split('@').first : 'User');
+    final namePlaceholder =
+        firebaseUser.displayName ??
+        (email.isNotEmpty ? email.split('@').first : 'User');
 
     return UserModel(
       userId: firebaseUser.uid,
