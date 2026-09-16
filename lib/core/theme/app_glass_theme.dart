@@ -8,11 +8,18 @@ import 'app_colors.dart';
 ///
 /// This is the standard card treatment for Parts 6-13, not only Dashboard.
 class LightGlassPanel extends StatelessWidget {
-  const LightGlassPanel({required this.child, super.key, this.padding, this.borderRadius = 18});
+  const LightGlassPanel({
+    required this.child,
+    super.key,
+    this.padding,
+    this.borderRadius = 18,
+    this.strong = false,
+  });
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final double borderRadius;
+  final bool strong;
 
   @override
   Widget build(BuildContext context) {
@@ -20,13 +27,11 @@ class LightGlassPanel extends StatelessWidget {
     return ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: Container(
-          padding: padding,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: .80),
+            color: Colors.white.withValues(alpha: strong ? .85 : .75),
             borderRadius: radius,
-            border: Border.all(color: AppColors.border.withValues(alpha: .70)),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x160C4D48),
@@ -36,7 +41,62 @@ class LightGlassPanel extends StatelessWidget {
               ),
             ],
           ),
-          child: child,
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) => LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withValues(alpha: strong ? 1.0 : .8),
+                        const Color(0xFFB4E8D4).withValues(alpha: strong ? 0.6 : .2),
+                        Colors.white.withValues(alpha: .0),
+                      ],
+                      stops: const [0.0, 0.4, 1.0],
+                    ).createShader(bounds),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: radius,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 100,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(borderRadius),
+                        topRight: Radius.circular(borderRadius),
+                      ),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withValues(alpha: strong ? 0.4 : 0.2),
+                          Colors.white.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: padding ?? EdgeInsets.zero,
+                child: child,
+              ),
+            ],
+          ),
         ),
       ),
     );

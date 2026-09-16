@@ -5,6 +5,7 @@ import '../../core/theme/app_glass_theme.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/appointment_model.dart';
+import '../../widgets/appointments/schedule_appointment_dialog.dart';
 import '../../widgets/appointments/today_appointments_banner.dart';
 import '../../widgets/common/branch_badge.dart';
 import '../../widgets/common/empty_state.dart';
@@ -25,9 +26,21 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   AppointmentStatus? _selectedStatus;
   bool _isLoading = true;
 
+  /// Mutable local copy of the appointments list.
+  ///
+  /// Uses the same pattern as Follow-Ups (Part 11): start from a copy of
+  /// the mock list so that newly scheduled appointments can be prepended
+  /// via setState without mutating the shared mock constant.
+  ///
+  /// TODO: Replace this with a Firestore `appointments` stream; once live,
+  /// newly scheduled appointments written to Firestore will appear here
+  /// automatically via the stream and this local copy is no longer needed.
+  late List<Appointment> _appointments;
+
   @override
   void initState() {
     super.initState();
+    _appointments = List<Appointment>.from(mockAppointments);
     _loadAppointments();
   }
 
@@ -38,7 +51,9 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   }
 
   List<Appointment> get _filteredAppointments {
-    final appointments = mockAppointments.where((appointment) => _selectedStatus == null || appointment.status == _selectedStatus).toList();
+    final appointments = _appointments
+        .where((a) => _selectedStatus == null || a.status == _selectedStatus)
+        .toList();
     appointments.sort((a, b) => a.dateTime.compareTo(b.dateTime));
     return appointments;
   }
@@ -55,9 +70,11 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _Header(onSchedule: _showSchedulePlaceholder),
+                    _Header(onSchedule: _openScheduleDialog),
                     const SizedBox(height: 20),
-                    TodayAppointmentsBanner(todaysAppointments: todaysAppointmentsFor(mockAppointments)),
+                    TodayAppointmentsBanner(
+                      todaysAppointments: todaysAppointmentsFor(_appointments),
+                    ),
                     const SizedBox(height: 20),
                     FilterTabs<AppointmentStatus>(
                       options: AppointmentStatus.values,
@@ -67,7 +84,14 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                     ),
                     const SizedBox(height: 18),
                     if (_filteredAppointments.isEmpty)
-                      const SizedBox(height: 300, child: EmptyState(icon: Icons.event_available_outlined, title: 'No appointments found', message: 'No appointments match this filter.'))
+                      const SizedBox(
+                        height: 300,
+                        child: EmptyState(
+                          icon: Icons.event_available_outlined,
+                          title: 'No appointments found',
+                          message: 'No appointments match this filter.',
+                        ),
+                      )
                     else if (MediaQuery.sizeOf(context).width < 600)
                       _MobileAppointments(appointments: _filteredAppointments)
                     else
@@ -79,9 +103,18 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           );
   }
 
-  void _showSchedulePlaceholder() {
-    // TODO: Build ScheduleAppointmentDialog using the RegisterPetDialog pattern.
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Scheduling appointments is coming soon.')));
+  /// Opens [ScheduleAppointmentDialog] and, if an [Appointment] is returned,
+  /// prepends it to the local list and shows a confirmation snack bar.
+  Future<void> _openScheduleDialog() async {
+    final newAppointment = await showDialog<Appointment>(
+      context: context,
+      builder: (_) => const ScheduleAppointmentDialog(),
+    );
+    if (!mounted || newAppointment == null) return;
+    setState(() => _appointments.insert(0, newAppointment));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Appointment scheduled.')),
+    );
   }
 }
 
@@ -97,8 +130,27 @@ class _Header extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       runSpacing: 14,
       children: [
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Appointments', style: AppTypography.pageTitle), const SizedBox(height: 5), const Text('Manage clinic appointments and schedules.', style: AppTypography.pageSubtitle)]),
-        FilledButton.icon(onPressed: onSchedule, icon: const Icon(Icons.add, size: 18), label: const Text('Schedule Appointment'), style: FilledButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13))),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Appointments', style: AppTypography.pageTitle),
+            const SizedBox(height: 5),
+            const Text(
+              'Manage clinic appointments and schedules.',
+              style: AppTypography.pageSubtitle,
+            ),
+          ],
+        ),
+        FilledButton.icon(
+          onPressed: onSchedule,
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Schedule Appointment'),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          ),
+        ),
       ],
     );
   }
@@ -116,7 +168,7 @@ class _DesktopAppointments extends StatelessWidget {
       child: Column(children: [
         const _TableHeader(),
         const Divider(height: 18),
-        ...appointments.map((appointment) => _DesktopAppointmentRow(appointment: appointment)),
+        ...appointments.map((a) => _DesktopAppointmentRow(appointment: a)),
       ]),
     );
   }
@@ -127,7 +179,15 @@ class _TableHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(children: [Expanded(flex: 2, child: _HeaderLabel('Pet & Owner')), Expanded(flex: 2, child: _HeaderLabel('Date & Time')), Expanded(flex: 2, child: _HeaderLabel('Reason')), Expanded(flex: 2, child: _HeaderLabel('Veterinarian')), Expanded(flex: 2, child: _HeaderLabel('Branch')), Expanded(child: _HeaderLabel('Status')), SizedBox(width: 28)]);
+    return const Row(children: [
+      Expanded(flex: 2, child: _HeaderLabel('Pet & Owner')),
+      Expanded(flex: 2, child: _HeaderLabel('Date & Time')),
+      Expanded(flex: 2, child: _HeaderLabel('Reason')),
+      Expanded(flex: 2, child: _HeaderLabel('Veterinarian')),
+      Expanded(flex: 2, child: _HeaderLabel('Branch')),
+      Expanded(child: _HeaderLabel('Status')),
+      SizedBox(width: 28),
+    ]);
   }
 }
 
@@ -136,7 +196,14 @@ class _HeaderLabel extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) => Text(label.toUpperCase(), style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.w800));
+  Widget build(BuildContext context) => Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+        ),
+      );
 }
 
 class _DesktopAppointmentRow extends StatelessWidget {
@@ -155,11 +222,30 @@ class _DesktopAppointmentRow extends StatelessWidget {
         child: Row(children: [
           Expanded(flex: 2, child: _PetOwner(appointment: appointment)),
           Expanded(flex: 2, child: _DateTimeText(dateTime: appointment.dateTime)),
-          Expanded(flex: 2, child: Text(appointment.reason, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textPrimary, fontSize: 12))),
-          Expanded(flex: 2, child: Text(appointment.veterinarianName, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11))),
+          Expanded(
+            flex: 2,
+            child: Text(
+              appointment.reason,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              appointment.veterinarianName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+            ),
+          ),
           Expanded(flex: 2, child: BranchBadge(branchName: appointment.branch)),
           Expanded(child: _AppointmentStatus(status: appointment.status)),
-          const SizedBox(width: 28, child: Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20)),
+          const SizedBox(
+            width: 28,
+            child: Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20),
+          ),
         ]),
       ),
     );
@@ -171,7 +257,34 @@ class _PetOwner extends StatelessWidget {
   final Appointment appointment;
 
   @override
-  Widget build(BuildContext context) => Row(children: [PetAvatar(species: _speciesFor(appointment.petName), size: 34), const SizedBox(width: 9), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(appointment.petName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w700)), const SizedBox(height: 3), Text(appointment.ownerName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10))]))]);
+  Widget build(BuildContext context) => Row(children: [
+        PetAvatar(species: _speciesFor(appointment.petName), size: 34),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                appointment.petName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                appointment.ownerName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+              ),
+            ],
+          ),
+        ),
+      ]);
 }
 
 class _DateTimeText extends StatelessWidget {
@@ -179,7 +292,24 @@ class _DateTimeText extends StatelessWidget {
   final DateTime dateTime;
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(_formatDate(dateTime), style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w700)), const SizedBox(height: 3), Text(_formatTime(dateTime), style: const TextStyle(color: AppColors.textSecondary, fontSize: 11))]);
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _formatDate(dateTime),
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            _formatTime(dateTime),
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+          ),
+        ],
+      );
 }
 
 class _AppointmentStatus extends StatelessWidget {
@@ -189,7 +319,11 @@ class _AppointmentStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _statusColor(status);
-    return StatusBadge(label: _statusLabel(status), color: color, backgroundColor: color.withValues(alpha: .10));
+    return StatusBadge(
+      label: _statusLabel(status),
+      color: color,
+      backgroundColor: color.withValues(alpha: .10),
+    );
   }
 }
 
@@ -198,7 +332,16 @@ class _MobileAppointments extends StatelessWidget {
   final List<Appointment> appointments;
 
   @override
-  Widget build(BuildContext context) => Column(children: appointments.map((appointment) => Padding(padding: const EdgeInsets.only(bottom: 14), child: _MobileAppointmentCard(appointment: appointment))).toList());
+  Widget build(BuildContext context) => Column(
+        children: appointments
+            .map(
+              (a) => Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: _MobileAppointmentCard(appointment: a),
+              ),
+            )
+            .toList(),
+      );
 }
 
 class _MobileAppointmentCard extends StatelessWidget {
@@ -214,15 +357,36 @@ class _MobileAppointmentCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       child: LightGlassPanel(
         padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [PetAvatar(species: _speciesFor(appointment.petName)), const SizedBox(width: 10), Expanded(child: _PetOwner(appointment: appointment)), _AppointmentStatus(status: appointment.status)]),
-          const Divider(height: 24),
-          Row(children: [Expanded(child: _MobileDetail(label: 'Date & time', value: '${_formatDate(appointment.dateTime)} · ${_formatTime(appointment.dateTime)}')), Expanded(child: _MobileDetail(label: 'Veterinarian', value: appointment.veterinarianName))]),
-          const SizedBox(height: 12),
-          _MobileDetail(label: 'Reason', value: appointment.reason),
-          const SizedBox(height: 12),
-          BranchBadge(branchName: appointment.branch),
-        ]),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              PetAvatar(species: _speciesFor(appointment.petName)),
+              const SizedBox(width: 10),
+              Expanded(child: _PetOwner(appointment: appointment)),
+              _AppointmentStatus(status: appointment.status),
+            ]),
+            const Divider(height: 24),
+            Row(children: [
+              Expanded(
+                child: _MobileDetail(
+                  label: 'Date & time',
+                  value: '${_formatDate(appointment.dateTime)} · ${_formatTime(appointment.dateTime)}',
+                ),
+              ),
+              Expanded(
+                child: _MobileDetail(
+                  label: 'Veterinarian',
+                  value: appointment.veterinarianName,
+                ),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            _MobileDetail(label: 'Reason', value: appointment.reason),
+            const SizedBox(height: 12),
+            BranchBadge(branchName: appointment.branch),
+          ],
+        ),
       ),
     );
   }
@@ -234,12 +398,49 @@ class _MobileDetail extends StatelessWidget {
   final String value;
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)), const SizedBox(height: 3), Text(value, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w700))]);
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      );
 }
 
-String _statusLabel(AppointmentStatus status) => switch (status) { AppointmentStatus.scheduled => 'Scheduled', AppointmentStatus.completed => 'Completed', AppointmentStatus.cancelled => 'Cancelled' };
-Color _statusColor(AppointmentStatus status) => switch (status) { AppointmentStatus.scheduled => AppColors.statusInfo, AppointmentStatus.completed => AppColors.statusSuccess, AppointmentStatus.cancelled => AppColors.textSecondary };
-String _formatTime(DateTime date) => '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-String _formatDate(DateTime date) => '${date.day.toString().padLeft(2, '0')} ${_month(date.month)} ${date.year}';
-String _month(int month) => const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1];
-String _speciesFor(String petName) => switch (petName) { 'Luna' => 'Cat', 'Milo' => 'Rabbit', 'Coco' => 'Bird', _ => 'Dog' };
+String _statusLabel(AppointmentStatus status) => switch (status) {
+      AppointmentStatus.scheduled => 'Scheduled',
+      AppointmentStatus.completed => 'Completed',
+      AppointmentStatus.cancelled => 'Cancelled',
+    };
+
+Color _statusColor(AppointmentStatus status) => switch (status) {
+      AppointmentStatus.scheduled => AppColors.statusInfo,
+      AppointmentStatus.completed => AppColors.statusSuccess,
+      AppointmentStatus.cancelled => AppColors.textSecondary,
+    };
+
+String _formatTime(DateTime date) =>
+    '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+
+String _formatDate(DateTime date) =>
+    '${date.day.toString().padLeft(2, '0')} ${_month(date.month)} ${date.year}';
+
+String _month(int month) =>
+    const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1];
+
+String _speciesFor(String petName) => switch (petName) {
+      'Luna' => 'Cat',
+      'Milo' => 'Rabbit',
+      'Coco' => 'Bird',
+      _ => 'Dog',
+    };

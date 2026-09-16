@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/landing_theme.dart';
 import 'landing_buttons.dart';
+import 'scroll_reveal.dart';
 
 /// Hero message and illustrative dashboard preview.
 class HeroSection extends StatelessWidget {
@@ -37,20 +38,9 @@ class HeroSection extends StatelessWidget {
               amber: true,
               onPressed: onGetStarted,
             ),
-            OutlinedButton(
+            GlassSecondaryButton(
+              label: 'See how it works',
               onPressed: () {},
-              style: OutlinedButton.styleFrom(
-                foregroundColor: LandingTheme.textPrimary,
-                side: BorderSide(color: Colors.white.withValues(alpha: .18)),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 22,
-                  vertical: 16,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text('See how it works'),
             ),
           ],
         ),
@@ -69,14 +59,36 @@ class HeroSection extends StatelessWidget {
         ? Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(flex: 4, child: copy),
+              Expanded(
+                flex: 4,
+                child: ScrollReveal(
+                  delay: const Duration(milliseconds: 100),
+                  child: copy,
+                ),
+              ),
               const SizedBox(width: 70),
-              Expanded(flex: 6, child: preview),
+              Expanded(
+                flex: 6,
+                child: ScrollReveal(
+                  delay: const Duration(milliseconds: 200),
+                  child: preview,
+                ),
+              ),
             ],
           )
         : Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [copy, const SizedBox(height: 54), preview],
+            children: [
+              ScrollReveal(
+                delay: const Duration(milliseconds: 100),
+                child: copy,
+              ),
+              const SizedBox(height: 54),
+              ScrollReveal(
+                delay: const Duration(milliseconds: 200),
+                child: preview,
+              ),
+            ],
           );
   }
 }
@@ -103,14 +115,47 @@ class _TrustStat extends StatelessWidget {
   );
 }
 
-class _DashboardPreview extends StatelessWidget {
+class _DashboardPreview extends StatefulWidget {
   const _DashboardPreview();
 
   @override
+  State<_DashboardPreview> createState() => _DashboardPreviewState();
+}
+
+class _DashboardPreviewState extends State<_DashboardPreview> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _floatAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 5),
+    )..repeat(reverse: true);
+    
+    _floatAnimation = Tween<double>(begin: -8.0, end: 8.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
+    return AnimatedBuilder(
+      animation: _floatAnimation,
+      builder: (context, child) => Transform.translate(
+        offset: Offset(0, _floatAnimation.value),
+        child: child,
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
         const Positioned(
           top: -85,
           right: -45,
@@ -207,6 +252,7 @@ class _DashboardPreview extends StatelessWidget {
           ),
         ),
       ],
+      ),
     );
   }
 }

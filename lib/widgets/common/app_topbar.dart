@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../models/notification_model.dart';
+import 'notification_panel.dart';
 
-class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
+/// Top application bar used in both the desktop [Row] layout and as the
+/// mobile [Scaffold.appBar].
+///
+/// Converted to [StatefulWidget] to hold local notification state and
+/// the open/closed state of [NotificationPanel].
+class AppTopBar extends StatefulWidget implements PreferredSizeWidget {
   const AppTopBar({
     required this.currentBranch,
     required this.onMenuTap,
@@ -22,10 +29,85 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(64);
 
   @override
+  State<AppTopBar> createState() => _AppTopBarState();
+}
+
+class _AppTopBarState extends State<AppTopBar> {
+  /// Local copy of notifications — mutable so that marking one read
+  /// re-renders the badge count immediately.
+  late List<AppNotification> _notifications;
+
+  /// Overlay entry for the notification panel; non-null while the panel is open.
+  OverlayEntry? _overlayEntry;
+
+  /// LayerLink that anchors the panel to the bell icon.
+  final _bellLayerLink = LayerLink();
+
+  bool get _panelOpen => _overlayEntry != null;
+
+  int get _unreadCount => _notifications.where((n) => !n.isRead).length;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start from a fresh copy of the mock list so mutations stay local to
+    // this widget instance and don't bleed into the global mock.
+    _notifications = mockNotifications.map((n) => n.markRead()..isRead = n.isRead).toList();
+  }
+
+  @override
+  void dispose() {
+    _closePanel();
+    super.dispose();
+  }
+
+  // ── Panel lifecycle ───────────────────────────────────────────────────────
+
+  void _togglePanel() {
+    if (_panelOpen) {
+      _closePanel();
+    } else {
+      _openPanel();
+    }
+  }
+
+  void _openPanel() {
+    final overlay = Overlay.of(context);
+    _overlayEntry = OverlayEntry(
+      builder: (_) => NotificationPanel(
+        layerLink: _bellLayerLink,
+        notifications: _notifications,
+        onDismiss: _closePanel,
+        onMarkRead: _markRead,
+      ),
+    );
+    overlay.insert(_overlayEntry!);
+    setState(() {}); // update bell highlight if desired
+  }
+
+  void _closePanel() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+    if (mounted) setState(() {});
+  }
+
+  void _markRead(String id) {
+    final index = _notifications.indexWhere((n) => n.id == id);
+    if (index < 0) return;
+    setState(() {
+      _notifications[index] = _notifications[index].markRead();
+    });
+    // Rebuild the overlay so the panel reflects the new read state.
+    _overlayEntry?.markNeedsBuild();
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
+  @override
   Widget build(BuildContext context) {
     final narrow = MediaQuery.sizeOf(context).width < 700;
     return Container(
-      height: preferredSize.height,
+      height: widget.preferredSize.height,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(bottom: BorderSide(color: AppColors.border)),
@@ -33,26 +115,33 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          if (showMenuButton) ...[
+          if (widget.showMenuButton) ...[
             IconButton(
               tooltip: 'Open navigation',
-              onPressed: onMenuTap,
+              onPressed: widget.onMenuTap,
               icon: const Icon(Icons.menu_rounded),
             ),
             const SizedBox(width: 4),
           ],
           Expanded(child: narrow ? _SearchIconButton() : const _SearchField()),
           const SizedBox(width: 16),
-          _BranchSelector(branch: currentBranch),
+          _BranchSelector(branch: widget.currentBranch),
           const SizedBox(width: 14),
-          const _NotificationButton(),
+          _NotificationButton(
+            layerLink: _bellLayerLink,
+            unreadCount: _unreadCount,
+            isOpen: _panelOpen,
+            onTap: _togglePanel,
+          ),
           const SizedBox(width: 14),
-          _UserMenu(name: userName, initials: userInitials),
+          _UserMenu(name: widget.userName, initials: widget.userInitials),
         ],
       ),
     );
   }
 }
+
+// ── Private sub-widgets ───────────────────────────────────────────────────────
 
 class _SearchField extends StatelessWidget {
   const _SearchField();
@@ -131,29 +220,64 @@ class _BranchSelector extends StatelessWidget {
   }
 }
 
+/// Bell icon button with a live badge count.
+///
+/// Uses [CompositedTransformTarget] so [NotificationPanel] can anchor
+/// to this widget's position via a shared [LayerLink].
 class _NotificationButton extends StatelessWidget {
-  const _NotificationButton();
+  const _NotificationButton({
+    required this.layerLink,
+    required this.unreadCount,
+    required this.isOpen,
+    required this.onTap,
+  });
+
+  final LayerLink layerLink;
+  final int unreadCount;
+  final bool isOpen;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        IconButton(
-          tooltip: 'Notifications',
-          onPressed: () {},
-          icon: const Icon(Icons.notifications_none_outlined),
-        ),
-        Positioned(
-          top: 8,
-          right: 8,
-          child: Container(
-            width: 7,
-            height: 7,
-            decoration: const BoxDecoration(color: Color(0xFFE55353), shape: BoxShape.circle),
+    return CompositedTransformTarget(
+      link: layerLink,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          IconButton(
+            tooltip: 'Notifications',
+            onPressed: onTap,
+            icon: Icon(
+              isOpen ? Icons.notifications_rounded : Icons.notifications_none_outlined,
+              color: isOpen ? AppColors.primary : null,
+            ),
           ),
-        ),
-      ],
+          if (unreadCount > 0)
+            Positioned(
+              top: 6,
+              right: 6,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE55353),
+                    borderRadius: BorderRadius.all(Radius.circular(10)),
+                  ),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  child: Text(
+                    '$unreadCount',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

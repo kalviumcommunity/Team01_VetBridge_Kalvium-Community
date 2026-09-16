@@ -39,6 +39,7 @@ dependencies:
   cloud_firestore: ^6.8.0
   google_fonts: ^6.2.1
   provider: ^6.1.2
+  visibility_detector: ^0.4.0+2
 
 dev_dependencies:
   flutter_test:
