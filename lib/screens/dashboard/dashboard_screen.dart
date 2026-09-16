@@ -7,8 +7,14 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/appointment_model.dart';
 import '../../models/dashboard_models.dart';
+import '../../models/follow_up_model.dart';
+import '../../models/pet_model.dart';
+import '../../services/appointment_service.dart';
+import '../../services/follow_up_service.dart';
+import '../../services/pet_service.dart';
 import '../../widgets/appointments/schedule_appointment_dialog.dart';
 import '../../widgets/common/empty_state.dart';
+import '../../widgets/common/loading_widget.dart';
 import '../../widgets/common/pet_avatar.dart';
 import '../../widgets/common/status_badge.dart';
 
@@ -24,38 +30,180 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  DashboardData? _data;
+  /// Builds [DashboardData] from real Firestore collections.
+  DashboardData _buildDashboardData(
+    List<Pet> pets,
+    List<Appointment> appointments,
+    List<FollowUp> followUps,
+  ) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
 
-  @override
-  void initState() {
-    super.initState();
-    _loadDashboard();
-  }
+    // Stats
+    final todaysAppointments = appointments
+        .where((a) {
+          final d = DateTime(a.dateTime.year, a.dateTime.month, a.dateTime.day);
+          return d == today && a.status == AppointmentStatus.scheduled;
+        })
+        .length;
 
-  Future<void> _loadDashboard() async {
-    // TODO: Replace this mock delay and data with Firestore repository calls.
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (mounted) setState(() => _data = DashboardData.mock());
+    final upcomingAppointments = appointments
+        .where((a) =>
+            a.dateTime.isAfter(tomorrow) &&
+            a.status == AppointmentStatus.scheduled)
+        .length;
+
+    final pendingFollowUps =
+        followUps.where((f) => f.status == FollowUpStatus.pending).length;
+
+    // Today's appointment rows (max 5 for dashboard)
+    final todaysApptList = appointments
+        .where((a) {
+          final d = DateTime(a.dateTime.year, a.dateTime.month, a.dateTime.day);
+          return d == today && a.status == AppointmentStatus.scheduled;
+        })
+        .toList()
+      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+
+    final dashboardAppts = todaysApptList.take(5).map((a) {
+      final t = a.dateTime;
+      final time =
+          '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+      return DashboardAppointment(
+        petName: a.petName,
+        ownerName: a.ownerName,
+        time: time,
+        reason: a.reason,
+        status: 'Scheduled',
+        icon: Icons.pets_outlined,
+        iconColor: AppColors.statusInfo,
+      );
+    }).toList();
+
+    // Upcoming follow-up rows — pending only, soonest first (max 5)
+    final upcomingFollowUps = followUps
+        .where((f) => f.status == FollowUpStatus.pending)
+        .toList()
+      ..sort((a, b) => a.followUpDate.compareTo(b.followUpDate));
+
+    final dashboardFollowUps = upcomingFollowUps.take(5).map((f) {
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      ];
+      final d = f.followUpDate;
+      final dateStr =
+          '${d.day.toString().padLeft(2, '0')} ${months[d.month - 1]} ${d.year}';
+      final isOverdue = f.isOverdue;
+      return DashboardFollowUp(
+        petName: f.petName,
+        reason: f.reason,
+        date: dateStr,
+        status: isOverdue ? 'Overdue' : 'Pending',
+        statusColor:
+            isOverdue ? AppColors.statusDanger : AppColors.statusInfo,
+      );
+    }).toList();
+
+    // Recent pets — newest registered first (max 5)
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final sortedPets = [...pets];
+    // We don't have a registeredAt field on Pet, so show up to first 5
+    final recentPets = sortedPets.take(5).map((p) {
+      final lv = p.lastVisit;
+      final lastVisitStr = lv != null
+          ? '${lv.day.toString().padLeft(2, '0')} ${months[lv.month - 1]} ${lv.year}'
+          : '—';
+      return DashboardPet(
+        name: p.name,
+        ownerName: p.ownerName,
+        species: p.species,
+        breed: p.breed,
+        lastVisit: lastVisitStr,
+        status: p.status.name[0].toUpperCase() + p.status.name.substring(1),
+      );
+    }).toList();
+
+    return DashboardData(
+      stats: DashboardStats(
+        todaysAppointments: todaysAppointments,
+        registeredPets: pets.length,
+        upcomingAppointments: upcomingAppointments,
+        pendingFollowUps: pendingFollowUps,
+      ),
+      appointments: dashboardAppts,
+      followUps: dashboardFollowUps,
+      recentPets: recentPets,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return LightGlassBackground(
-      child: _data == null
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1240),
-                      child: _DashboardContent(data: _data!, userName: widget.userName, onSectionSelected: widget.onSectionSelected),
-                    ),
-                  ),
-                );
-              },
-            ),
+      child: StreamBuilder<List<Pet>>(
+        stream: PetService.instance.streamPets(),
+        builder: (context, petSnapshot) {
+          if (petSnapshot.connectionState == ConnectionState.waiting) {
+            return const LoadingWidget(message: 'Loading dashboard...');
+          }
+          if (petSnapshot.hasError) {
+            return Center(
+              child: EmptyState(
+                icon: Icons.error_outline,
+                title: 'Error loading dashboard',
+                message: petSnapshot.error.toString(),
+              ),
+            );
+          }
+
+          return StreamBuilder<List<Appointment>>(
+            stream: AppointmentService.instance.streamAppointments(),
+            builder: (context, apptSnapshot) {
+              if (apptSnapshot.connectionState == ConnectionState.waiting) {
+                return const LoadingWidget(message: 'Loading dashboard...');
+              }
+
+              return StreamBuilder<List<FollowUp>>(
+                stream: FollowUpService.instance.streamFollowUps(),
+                builder: (context, fuSnapshot) {
+                  if (fuSnapshot.connectionState == ConnectionState.waiting) {
+                    return const LoadingWidget(message: 'Loading dashboard...');
+                  }
+
+                  final pets = petSnapshot.data ?? [];
+                  final appointments = apptSnapshot.data ?? [];
+                  final followUps = fuSnapshot.data ?? [];
+                  final dashData =
+                      _buildDashboardData(pets, appointments, followUps);
+
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints:
+                                const BoxConstraints(maxWidth: 1240),
+                            child: _DashboardContent(
+                              data: dashData,
+                              userName: widget.userName,
+                              onSectionSelected: widget.onSectionSelected,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -120,10 +268,8 @@ class _GreetingHeader extends StatefulWidget {
 class _GreetingHeaderState extends State<_GreetingHeader> {
   /// Opens [ScheduleAppointmentDialog] from the Dashboard greeting area.
   ///
-  /// TODO: Once appointments come from a single Firestore source, this and
-  /// the Appointments screen will naturally stay in sync — for now they use
-  /// separate mock lists. The confirmation SnackBar is sufficient feedback
-  /// until the shared Firestore stream lands.
+  /// Appointments are written to Firestore by the dialog itself; the shared
+  /// Firestore stream on the Appointments screen will pick them up automatically.
   Future<void> _scheduleAppointment() async {
     final newAppointment = await showDialog<Appointment>(
       context: context,

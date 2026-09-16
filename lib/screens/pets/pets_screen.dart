@@ -7,6 +7,7 @@ import '../../core/theme/app_typography.dart';
 import '../../models/pet_model.dart';
 import 'pet_details_screen.dart';
 import '../../widgets/common/branch_badge.dart';
+import '../../services/pet_service.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/loading_widget.dart';
 import '../../widgets/common/pet_avatar.dart';
@@ -24,34 +25,13 @@ class PetsScreen extends StatefulWidget {
 
 class _PetsScreenState extends State<PetsScreen> {
   final _searchController = TextEditingController();
-  late List<Pet> _pets;
   String _searchQuery = '';
   String _speciesFilter = 'All';
   String _statusFilter = 'All';
-  bool _isLoading = true;
 
-  @override
-  void initState() {
-    super.initState();
-    _pets = List<Pet>.from(mockPets);
-    _loadPets();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadPets() async {
-    // TODO: Replace the mock delay with the Firestore `pets` stream.
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (mounted) setState(() => _isLoading = false);
-  }
-
-  List<Pet> get _filteredPets {
+  List<Pet> _filterPets(List<Pet> allPets) {
     final query = _searchQuery.trim().toLowerCase();
-    return _pets.where((pet) {
+    return allPets.where((pet) {
       final matchesQuery = query.isEmpty || [pet.id, pet.name, pet.ownerName, pet.ownerPhone, pet.microchipId ?? ''].any((value) => value.toLowerCase().contains(query));
       final matchesSpecies = _speciesFilter == 'All' || pet.species == _speciesFilter;
       final matchesStatus = _statusFilter == 'All' || pet.status.name == _statusFilter.toLowerCase();
@@ -64,47 +44,64 @@ class _PetsScreenState extends State<PetsScreen> {
     final mobile = MediaQuery.sizeOf(context).width < 600;
     return Container(
       color: Colors.transparent,
-      child: _isLoading
-          ? const LoadingWidget(message: 'Loading pets...')
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1240),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _Header(onRegister: _openRegisterDialog),
-                      const SizedBox(height: 22),
-                      _FilterBar(
-                        controller: _searchController,
-                        species: _speciesFilter,
-                        status: _statusFilter,
-                        onSearchChanged: (value) => setState(() => _searchQuery = value),
-                        onSpeciesChanged: (value) => setState(() => _speciesFilter = value!),
-                        onStatusChanged: (value) => setState(() => _statusFilter = value!),
-                      ),
-                      const SizedBox(height: 18),
-                      if (_filteredPets.isEmpty)
-                        const SizedBox(height: 280, child: EmptyState(icon: Icons.pets_outlined, title: 'No pets found', message: 'Try adjusting your search or filters.'))
-                      else if (mobile)
-                        _MobilePetList(pets: _filteredPets)
-                      else
-                        _DesktopPetTable(pets: _filteredPets),
-                    ],
-                  ),
+      child: StreamBuilder<List<Pet>>(
+        stream: PetService.instance.streamPets(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const LoadingWidget(message: 'Loading pets...');
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: EmptyState(
+                icon: Icons.error_outline,
+                title: 'Error loading pets',
+                message: snapshot.error.toString(),
+              ),
+            );
+          }
+          
+          final allPets = snapshot.data ?? [];
+          final filteredPets = _filterPets(allPets);
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1240),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _Header(onRegister: _openRegisterDialog),
+                    const SizedBox(height: 22),
+                    _FilterBar(
+                      controller: _searchController,
+                      species: _speciesFilter,
+                      status: _statusFilter,
+                      onSearchChanged: (value) => setState(() => _searchQuery = value),
+                      onSpeciesChanged: (value) => setState(() => _speciesFilter = value!),
+                      onStatusChanged: (value) => setState(() => _statusFilter = value!),
+                    ),
+                    const SizedBox(height: 18),
+                    if (filteredPets.isEmpty)
+                      const SizedBox(height: 280, child: EmptyState(icon: Icons.pets_outlined, title: 'No pets found', message: 'Try adjusting your search or filters.'))
+                    else if (mobile)
+                      _MobilePetList(pets: filteredPets)
+                    else
+                      _DesktopPetTable(pets: filteredPets),
+                  ],
                 ),
               ),
             ),
+          );
+        },
+      ),
     );
   }
 
   Future<void> _openRegisterDialog() async {
     await showDialog<void>(
       context: context,
-      builder: (_) => RegisterPetDialog(
-        onRegistered: (pet) => setState(() => _pets.insert(0, pet)),
-      ),
+      builder: (_) => const RegisterPetDialog(),
     );
   }
 }

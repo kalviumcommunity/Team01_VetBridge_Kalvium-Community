@@ -5,9 +5,9 @@ import '../../core/theme/app_glass_theme.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/appointment_model.dart';
+import '../../services/appointment_service.dart';
 import '../../widgets/appointments/schedule_appointment_dialog.dart';
 import '../../widgets/appointments/today_appointments_banner.dart';
-import '../../widgets/common/branch_badge.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/filter_tabs.dart';
 import '../../widgets/common/loading_widget.dart';
@@ -24,34 +24,8 @@ class AppointmentsScreen extends StatefulWidget {
 
 class _AppointmentsScreenState extends State<AppointmentsScreen> {
   AppointmentStatus? _selectedStatus;
-  bool _isLoading = true;
-
-  /// Mutable local copy of the appointments list.
-  ///
-  /// Uses the same pattern as Follow-Ups (Part 11): start from a copy of
-  /// the mock list so that newly scheduled appointments can be prepended
-  /// via setState without mutating the shared mock constant.
-  ///
-  /// TODO: Replace this with a Firestore `appointments` stream; once live,
-  /// newly scheduled appointments written to Firestore will appear here
-  /// automatically via the stream and this local copy is no longer needed.
-  late List<Appointment> _appointments;
-
-  @override
-  void initState() {
-    super.initState();
-    _appointments = List<Appointment>.from(mockAppointments);
-    _loadAppointments();
-  }
-
-  Future<void> _loadAppointments() async {
-    // TODO: Replace this mock delay with a Firestore appointments stream.
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (mounted) setState(() => _isLoading = false);
-  }
-
-  List<Appointment> get _filteredAppointments {
-    final appointments = _appointments
+  List<Appointment> _filterAppointments(List<Appointment> allAppointments) {
+    final appointments = allAppointments
         .where((a) => _selectedStatus == null || a.status == _selectedStatus)
         .toList();
     appointments.sort((a, b) => a.dateTime.compareTo(b.dateTime));
@@ -60,58 +34,76 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return _isLoading
-        ? const LoadingWidget(message: 'Loading appointments...')
-        : SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1240),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _Header(onSchedule: _openScheduleDialog),
-                    const SizedBox(height: 20),
-                    TodayAppointmentsBanner(
-                      todaysAppointments: todaysAppointmentsFor(_appointments),
-                    ),
-                    const SizedBox(height: 20),
-                    FilterTabs<AppointmentStatus>(
-                      options: AppointmentStatus.values,
-                      selected: _selectedStatus,
-                      onChanged: (value) => setState(() => _selectedStatus = value),
-                      labelBuilder: _statusLabel,
-                    ),
-                    const SizedBox(height: 18),
-                    if (_filteredAppointments.isEmpty)
-                      const SizedBox(
-                        height: 300,
-                        child: EmptyState(
-                          icon: Icons.event_available_outlined,
-                          title: 'No appointments found',
-                          message: 'No appointments match this filter.',
-                        ),
-                      )
-                    else if (MediaQuery.sizeOf(context).width < 600)
-                      _MobileAppointments(appointments: _filteredAppointments)
-                    else
-                      _DesktopAppointments(appointments: _filteredAppointments),
-                  ],
-                ),
-              ),
+    return StreamBuilder<List<Appointment>>(
+      stream: AppointmentService.instance.streamAppointments(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const LoadingWidget(message: 'Loading appointments...');
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: EmptyState(
+              icon: Icons.error_outline,
+              title: 'Error loading appointments',
+              message: snapshot.error.toString(),
             ),
           );
+        }
+
+        final allAppointments = snapshot.data ?? [];
+        final filteredAppointments = _filterAppointments(allAppointments);
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1240),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _Header(onSchedule: _openScheduleDialog),
+                  const SizedBox(height: 20),
+                  TodayAppointmentsBanner(
+                    todaysAppointments: todaysAppointmentsFor(allAppointments),
+                  ),
+                  const SizedBox(height: 20),
+                  FilterTabs<AppointmentStatus>(
+                    options: AppointmentStatus.values,
+                    selected: _selectedStatus,
+                    onChanged: (value) => setState(() => _selectedStatus = value),
+                    labelBuilder: _statusLabel,
+                  ),
+                  const SizedBox(height: 18),
+                  if (filteredAppointments.isEmpty)
+                    const SizedBox(
+                      height: 300,
+                      child: EmptyState(
+                        icon: Icons.event_available_outlined,
+                        title: 'No appointments found',
+                        message: 'No appointments match this filter.',
+                      ),
+                    )
+                  else if (MediaQuery.sizeOf(context).width < 600)
+                    _MobileAppointments(appointments: filteredAppointments)
+                  else
+                    _DesktopAppointments(appointments: filteredAppointments),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// Opens [ScheduleAppointmentDialog] and, if an [Appointment] is returned,
-  /// prepends it to the local list and shows a confirmation snack bar.
+  /// shows a confirmation snack bar.
   Future<void> _openScheduleDialog() async {
     final newAppointment = await showDialog<Appointment>(
       context: context,
       builder: (_) => const ScheduleAppointmentDialog(),
     );
     if (!mounted || newAppointment == null) return;
-    setState(() => _appointments.insert(0, newAppointment));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Appointment scheduled.')),
     );
@@ -184,7 +176,6 @@ class _TableHeader extends StatelessWidget {
       Expanded(flex: 2, child: _HeaderLabel('Date & Time')),
       Expanded(flex: 2, child: _HeaderLabel('Reason')),
       Expanded(flex: 2, child: _HeaderLabel('Veterinarian')),
-      Expanded(flex: 2, child: _HeaderLabel('Branch')),
       Expanded(child: _HeaderLabel('Status')),
       SizedBox(width: 28),
     ]);
@@ -240,7 +231,6 @@ class _DesktopAppointmentRow extends StatelessWidget {
               style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
             ),
           ),
-          Expanded(flex: 2, child: BranchBadge(branchName: appointment.branch)),
           Expanded(child: _AppointmentStatus(status: appointment.status)),
           const SizedBox(
             width: 28,
@@ -383,8 +373,6 @@ class _MobileAppointmentCard extends StatelessWidget {
             ]),
             const SizedBox(height: 12),
             _MobileDetail(label: 'Reason', value: appointment.reason),
-            const SizedBox(height: 12),
-            BranchBadge(branchName: appointment.branch),
           ],
         ),
       ),

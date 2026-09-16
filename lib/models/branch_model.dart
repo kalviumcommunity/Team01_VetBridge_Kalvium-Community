@@ -22,6 +22,19 @@ class Branch {
   final int activePetsCount;
   final int veterinariansCount;
   final String colorKey;
+
+  factory Branch.fromMap(Map<String, dynamic> map) {
+    return Branch(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+      address: map['address'] ?? '',
+      phone: map['phone'] ?? '',
+      email: map['email'] ?? '',
+      activePetsCount: map['activePetsCount'] ?? 0,
+      veterinariansCount: map['veterinariansCount'] ?? 0,
+      colorKey: map['colorKey'] ?? 'central',
+    );
+  }
 }
 
 // TODO: Replace this mock list with a Firestore `branches` collection query.

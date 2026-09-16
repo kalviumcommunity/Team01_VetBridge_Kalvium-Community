@@ -1,6 +1,16 @@
 import 'medical_summary_model.dart';
+import 'follow_up_model.dart';
+import 'treatment_model.dart';
+import 'vaccination_model.dart';
 
-/// Full cross-branch medical record. The enum remains shared with Part 7.
+/// Lightweight UI-only display row for the Medical Records timeline.
+///
+/// This is NOT a Firestore collection — it is a pure presentation type.
+/// The actual data comes from the separate [Treatment], [Vaccination], and
+/// [FollowUp] collections; see [buildMedicalTimeline] for the merge logic.
+///
+/// The old `mockMedicalRecords` list has been removed; it contained fabricated
+/// data that didn't correspond to any real PRD collection.
 typedef MedicalRecordType = MedicalHistoryType;
 
 class MedicalRecord {
@@ -18,25 +28,81 @@ class MedicalRecord {
 
   final String id;
   final MedicalRecordType type;
+
+  /// Display title derived from the source record (diagnosis, vaccine name, or reason).
   final String title;
+
   final String petName;
   final String petId;
   final String veterinarianName;
+
+  /// Branch display string. For Appointments (which have no branch per PRD), this will be empty.
   final String branch;
+
   final DateTime date;
   final String? description;
 }
 
-// TODO: Replace this mock list with a Firestore `medicalRecords` collection query.
-// TODO: Part 7's mockMedicalHistoryFor(petId) should eventually filter this same collection by petId.
-final mockMedicalRecords = <MedicalRecord>[
-  MedicalRecord(id: 'REC-001', type: MedicalHistoryType.followUp, title: 'Recovery check - skin infection', petName: 'Buddy', petId: 'PET-001', veterinarianName: 'Dr. Ananya Krishnan', branch: 'Central Clinic', date: DateTime(2026, 8, 31), description: 'Check recovery and confirm medication is complete.'),
-  MedicalRecord(id: 'REC-002', type: MedicalHistoryType.followUp, title: 'Post-treatment respiratory check', petName: 'Luna', petId: 'PET-002', veterinarianName: 'Dr. Ananya Krishnan', branch: 'North Clinic', date: DateTime(2026, 8, 25)),
-  MedicalRecord(id: 'REC-003', type: MedicalHistoryType.treatment, title: 'Skin infection (bacterial dermatitis)', petName: 'Buddy', petId: 'PET-001', veterinarianName: 'Dr. Ananya Krishnan', branch: 'Central Clinic', date: DateTime(2026, 8, 24), description: 'Treatment plan started for bacterial dermatitis.'),
-  MedicalRecord(id: 'REC-004', type: MedicalHistoryType.vaccination, title: 'Rabies booster vaccination', petName: 'Luna', petId: 'PET-002', veterinarianName: 'Dr. Arjun Dev', branch: 'North Clinic', date: DateTime(2026, 8, 12)),
-  MedicalRecord(id: 'REC-005', type: MedicalHistoryType.treatment, title: 'Annual wellness examination', petName: 'Milo', petId: 'PET-004', veterinarianName: 'Dr. Meera Pillai', branch: 'Central Clinic', date: DateTime(2026, 8, 9)),
-  MedicalRecord(id: 'REC-006', type: MedicalHistoryType.vaccination, title: 'DHPP vaccination', petName: 'Max', petId: 'PET-003', veterinarianName: 'Dr. Meera Pillai', branch: 'South Clinic', date: DateTime(2026, 8, 3)),
-  MedicalRecord(id: 'REC-007', type: MedicalHistoryType.followUp, title: 'Hip assessment follow-up', petName: 'Max', petId: 'PET-003', veterinarianName: 'Dr. Arjun Dev', branch: 'South Clinic', date: DateTime(2026, 7, 28)),
-  MedicalRecord(id: 'REC-008', type: MedicalHistoryType.treatment, title: 'Ear infection recovery', petName: 'Bella', petId: 'PET-005', veterinarianName: 'Dr. Ananya Krishnan', branch: 'North Clinic', date: DateTime(2026, 7, 21)),
-  MedicalRecord(id: 'REC-009', type: MedicalHistoryType.vaccination, title: 'Bordetella vaccination', petName: 'Milo', petId: 'PET-004', veterinarianName: 'Dr. Meera Pillai', branch: 'Central Clinic', date: DateTime(2026, 7, 15)),
-];
+/// Merges [Treatment], [Vaccination], and [FollowUp] collections into a single
+/// sorted timeline of [MedicalRecord] display rows.
+///
+/// This merge happens client-side — the database keeps three separate collections.
+/// TODO: When connected to Firestore, replace the mock lists with real queries.
+List<MedicalRecord> buildMedicalTimeline({
+  List<Treatment>? treatments,
+  List<Vaccination>? vaccinations,
+  List<FollowUp>? followUps,
+}) {
+  final records = <MedicalRecord>[];
+
+  for (final t in (treatments ?? mockTreatments)) {
+    records.add(MedicalRecord(
+      id: t.id,
+      type: MedicalHistoryType.treatment,
+      title: t.diagnosis,
+      petName: t.petName,
+      petId: t.petId,
+      veterinarianName: t.veterinarianName,
+      branch: _branchLabel(t.branchId),
+      date: t.treatmentDate,
+      description: t.notes,
+    ));
+  }
+
+  for (final v in (vaccinations ?? mockVaccinations)) {
+    records.add(MedicalRecord(
+      id: v.id,
+      type: MedicalHistoryType.vaccination,
+      title: '${v.vaccine} vaccination',
+      petName: v.petName,
+      petId: v.petId,
+      veterinarianName: v.veterinarianName,
+      branch: _branchLabel(v.branchId),
+      date: v.administrationDate,
+    ));
+  }
+
+  for (final f in (followUps ?? mockFollowUps)) {
+    records.add(MedicalRecord(
+      id: f.id,
+      type: MedicalHistoryType.followUp,
+      title: f.reason,
+      petName: f.petName,
+      petId: f.petId,
+      veterinarianName: '',
+      branch: '',
+      date: f.followUpDate,
+      description: f.note,
+    ));
+  }
+
+  records.sort((a, b) => b.date.compareTo(a.date));
+  return records;
+}
+
+String _branchLabel(String branchId) => switch (branchId) {
+      'central_clinic' => 'Central Clinic',
+      'north_clinic' => 'North Clinic',
+      'south_clinic' => 'South Clinic',
+      _ => branchId,
+    };
