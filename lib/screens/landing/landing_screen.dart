@@ -9,6 +9,7 @@ import '../../widgets/landing/how_it_works_section.dart';
 import '../../widgets/landing/landing_navbar.dart';
 import '../../widgets/landing/platform_preview_section.dart';
 import '../../widgets/landing/problem_section.dart';
+import '../../widgets/landing/scroll_reveal.dart';
 
 /// The only active product surface in Part 1: the VetBridge landing page.
 class LandingScreen extends StatelessWidget {
@@ -36,9 +37,11 @@ class LandingScreen extends StatelessWidget {
                 padding: EdgeInsets.fromLTRB(horizontal, 18, horizontal, 0),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1240),
-                  child: LandingNavbar(
-                    onLogin: () => onLogin(context),
-                    onGetStarted: () => onGetStarted(context),
+                  child: ScrollReveal(
+                    child: LandingNavbar(
+                      onLogin: () => onLogin(context),
+                      onGetStarted: () => onGetStarted(context),
+                    ),
                   ),
                 ),
               ),
@@ -53,16 +56,16 @@ class LandingScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             HeroSection(onGetStarted: () => onGetStarted(context)),
-                      const SizedBox(height: AppSpacing.sectionGap),
-                      const ProblemSection(),
-                      const SizedBox(height: AppSpacing.sectionGap),
-                      const FeaturesSection(),
-                      const SizedBox(height: AppSpacing.sectionGap),
-                      const HowItWorksSection(),
-                      const SizedBox(height: AppSpacing.sectionGap),
-                      const PlatformPreviewSection(),
-                      const SizedBox(height: AppSpacing.sectionGap),
-                            CtaAndFooter(onGetStarted: () => onGetStarted(context)),
+                            const SizedBox(height: AppSpacing.sectionGap),
+                            const ScrollReveal(child: ProblemSection()),
+                            const SizedBox(height: AppSpacing.sectionGap),
+                            const ScrollReveal(child: FeaturesSection()),
+                            const SizedBox(height: AppSpacing.sectionGap),
+                            const ScrollReveal(child: HowItWorksSection()),
+                            const SizedBox(height: AppSpacing.sectionGap),
+                            const ScrollReveal(child: PlatformPreviewSection()),
+                            const SizedBox(height: AppSpacing.sectionGap),
+                            ScrollReveal(child: CtaAndFooter(onGetStarted: () => onGetStarted(context))),
                           ],
                         ),
                       ),

@@ -1,0 +1,349 @@
+import 'package:flutter/material.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_glass_theme.dart';
+import '../../models/appointment_model.dart';
+import '../../models/pet_model.dart';
+import '../common/custom_text_field.dart';
+import '../common/primary_button.dart';
+
+/// Dialog for scheduling a new appointment.
+///
+/// Returns the created [Appointment] via [Navigator.pop] on success, or
+/// `null` if the user cancels.
+///
+/// TODO: On confirmation, write the new appointment to the Firestore
+/// `appointments` collection instead of returning the object locally.
+class ScheduleAppointmentDialog extends StatefulWidget {
+  const ScheduleAppointmentDialog({super.key});
+
+  @override
+  State<ScheduleAppointmentDialog> createState() => _ScheduleAppointmentDialogState();
+}
+
+class _ScheduleAppointmentDialogState extends State<ScheduleAppointmentDialog> {
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+
+  // Field state
+  Pet? _selectedPet;
+  DateTime? _selectedDate;
+  TimeOfDay? _selectedTime;
+  final _reasonController = TextEditingController();
+  final _vetController = TextEditingController();
+  String? _selectedBranch;
+
+  static const _branches = ['Central Clinic', 'North Clinic', 'South Clinic'];
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    _vetController.dispose();
+    super.dispose();
+  }
+
+  // ── Pickers ─────────────────────────────────────────────────────────────
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(primary: AppColors.primary),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _selectedDate = picked);
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _selectedTime ?? TimeOfDay.now(),
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: Theme.of(context).colorScheme.copyWith(primary: AppColors.primary),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _selectedTime = picked);
+  }
+
+  // ── Submit ───────────────────────────────────────────────────────────────
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    // Additional field-level checks for picker values.
+    bool hasError = false;
+    if (_selectedDate == null || _selectedTime == null || _selectedPet == null || _selectedBranch == null) {
+      hasError = true;
+    }
+    if (hasError) {
+      // The form validator covers text fields; the pickers are checked here.
+      // Trigger a rebuild to show error hints on picker rows.
+      setState(() {});
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // Mock ~600ms delay matching RegisterPetDialog's pattern.
+    // TODO: Replace this delay with a Firestore write to the `appointments` collection.
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+
+    if (!mounted) return;
+
+    final dt = DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+      _selectedTime!.hour,
+      _selectedTime!.minute,
+    );
+
+    final newAppointment = Appointment(
+      id: 'apt-${DateTime.now().millisecondsSinceEpoch}',
+      petName: _selectedPet!.name,
+      petId: _selectedPet!.id,
+      ownerName: _selectedPet!.ownerName,
+      veterinarianName: _vetController.text.trim().isEmpty ? 'TBD' : _vetController.text.trim(),
+      dateTime: dt,
+      reason: _reasonController.text.trim(),
+      branch: _selectedBranch!,
+      status: AppointmentStatus.scheduled,
+    );
+
+    Navigator.pop(context, newAppointment);
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  String _formatDate(DateTime d) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${d.day.toString().padLeft(2, '0')} ${months[d.month - 1]} ${d.year}';
+  }
+
+  String _formatTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  // ── Build ────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: LightGlassPanel(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Header ─────────────────────────────────────────────
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Schedule Appointment',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, size: 19),
+                        tooltip: 'Close',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ── Pet dropdown ───────────────────────────────────────
+                  DropdownButtonFormField<Pet>(
+                    initialValue: _selectedPet,
+                    decoration: _pickerDecoration('Pet', Icons.pets_outlined),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                    items: mockPets
+                        .map(
+                          (pet) => DropdownMenuItem<Pet>(
+                            value: pet,
+                            child: Text(
+                              '${pet.name} — ${pet.ownerName}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (pet) => setState(() => _selectedPet = pet),
+                    validator: (_) => _selectedPet == null ? 'Please select a pet' : null,
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── Date picker row ────────────────────────────────────
+                  _PickerRow(
+                    label: 'Date',
+                    icon: Icons.calendar_today_outlined,
+                    displayText: _selectedDate != null ? _formatDate(_selectedDate!) : null,
+                    placeholder: 'Select date',
+                    hasError: _selectedDate == null && _isLoading == false,
+                    onTap: _pickDate,
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── Time picker row ────────────────────────────────────
+                  _PickerRow(
+                    label: 'Time',
+                    icon: Icons.access_time_outlined,
+                    displayText: _selectedTime != null ? _formatTime(_selectedTime!) : null,
+                    placeholder: 'Select time',
+                    hasError: _selectedTime == null && _isLoading == false,
+                    onTap: _pickTime,
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── Reason ─────────────────────────────────────────────
+                  CustomTextField(
+                    label: 'Reason *',
+                    controller: _reasonController,
+                    prefixIcon: Icons.medical_services_outlined,
+                    hintText: 'e.g. Annual wellness check',
+                    validator: (value) =>
+                        value == null || value.trim().isEmpty ? 'Reason is required' : null,
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── Veterinarian ───────────────────────────────────────
+                  CustomTextField(
+                    label: 'Veterinarian',
+                    controller: _vetController,
+                    prefixIcon: Icons.person_outline,
+                    hintText: 'e.g. Dr. Ananya Krishnan',
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── Branch dropdown ────────────────────────────────────
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedBranch,
+                    decoration: _pickerDecoration('Branch *', Icons.location_on_outlined),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                    items: _branches
+                        .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                        .toList(),
+                    onChanged: (v) => setState(() => _selectedBranch = v),
+                    validator: (_) => _selectedBranch == null ? 'Please select a branch' : null,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Action buttons ─────────────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SecondaryButton(
+                          label: 'Cancel',
+                          onPressed: _isLoading ? null : () => Navigator.pop(context),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: PrimaryButton(
+                          label: 'Schedule',
+                          loadingLabel: 'Scheduling...',
+                          isLoading: _isLoading,
+                          icon: Icons.calendar_month_outlined,
+                          onPressed: _submit,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Private helpers ──────────────────────────────────────────────────────────
+
+InputDecoration _pickerDecoration(String label, IconData icon) => InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFD5E1DF)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFD5E1DF)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: AppColors.teal, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFD14B4B)),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFD14B4B), width: 2),
+      ),
+    );
+
+/// A tappable read-only field row used for the date/time pickers.
+class _PickerRow extends StatelessWidget {
+  const _PickerRow({
+    required this.label,
+    required this.icon,
+    required this.displayText,
+    required this.placeholder,
+    required this.hasError,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final String? displayText;
+  final String placeholder;
+  final bool hasError;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: InputDecorator(
+        decoration: _pickerDecoration(label, icon).copyWith(
+          suffixIcon: const Icon(Icons.chevron_right, size: 20),
+        ),
+        child: Text(
+          displayText ?? placeholder,
+          style: TextStyle(
+            color: displayText != null ? AppColors.textPrimary : AppColors.textSecondary,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    );
+  }
+}

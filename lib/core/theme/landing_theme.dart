@@ -54,17 +54,66 @@ class GlassPanel extends StatelessWidget {
     return ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
-          padding: padding,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: strong ? .10 : .06),
             borderRadius: radius,
-            border: Border.all(
-              color: Colors.white.withValues(alpha: strong ? .20 : .12),
-            ),
           ),
-          child: child,
+          child: Stack(
+            fit: StackFit.passthrough,
+            children: [
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) => LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withValues(alpha: strong ? .6 : .3),
+                        Colors.white.withValues(alpha: .0),
+                      ],
+                    ).createShader(bounds),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: radius,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 100,
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(borderRadius),
+                        topRight: Radius.circular(borderRadius),
+                      ),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withValues(alpha: strong ? .15 : .08),
+                          Colors.white.withValues(alpha: .0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: padding ?? EdgeInsets.zero,
+                child: child,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -101,48 +150,77 @@ class GradientOrb extends StatelessWidget {
   }
 }
 
-/// The fixed atmospheric background behind all landing-page content.
-class LandingBackground extends StatelessWidget {
+class LandingBackground extends StatefulWidget {
   const LandingBackground({required this.child, super.key});
-
   final Widget child;
 
   @override
+  State<LandingBackground> createState() => _LandingBackgroundState();
+}
+
+class _LandingBackgroundState extends State<LandingBackground> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _driftAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat(reverse: true);
+    _driftAnimation = Tween<double>(begin: -15.0, end: 15.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        const Positioned.fill(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  LandingTheme.inkTeal,
-                  LandingTheme.deepTeal,
-                  LandingTheme.inkTeal,
-                ],
+    return AnimatedBuilder(
+      animation: _driftAnimation,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      LandingTheme.inkTeal,
+                      LandingTheme.deepTeal,
+                      LandingTheme.inkTeal,
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        const Positioned(
-          top: -120,
-          right: -100,
-          child: GradientOrb(color: LandingTheme.mint, size: 460),
-        ),
-        const Positioned(
-          top: 720,
-          left: -180,
-          child: GradientOrb(color: LandingTheme.deepTealAlt, size: 520),
-        ),
-        const Positioned(
-          bottom: 260,
-          right: -160,
-          child: GradientOrb(color: LandingTheme.mint, size: 440),
-        ),
-        child,
-      ],
+            Positioned(
+              top: -120 + _driftAnimation.value,
+              right: -100 - _driftAnimation.value * 0.5,
+              child: const GradientOrb(color: LandingTheme.mint, size: 460),
+            ),
+            Positioned(
+              top: 720 - _driftAnimation.value,
+              left: -180 + _driftAnimation.value * 0.8,
+              child: const GradientOrb(color: LandingTheme.deepTealAlt, size: 520),
+            ),
+            Positioned(
+              bottom: 260 + _driftAnimation.value * 1.2,
+              right: -160 - _driftAnimation.value,
+              child: const GradientOrb(color: LandingTheme.mint, size: 440),
+            ),
+            widget.child,
+          ],
+        );
+      },
     );
   }
 }

@@ -5,7 +5,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_glass_theme.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
+import '../../models/appointment_model.dart';
 import '../../models/dashboard_models.dart';
+import '../../widgets/appointments/schedule_appointment_dialog.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/pet_avatar.dart';
 import '../../widgets/common/status_badge.dart';
@@ -103,11 +105,35 @@ class _DashboardContent extends StatelessWidget {
   }
 }
 
-class _GreetingHeader extends StatelessWidget {
+/// Greeting header converted to [StatefulWidget] to support opening the
+/// [ScheduleAppointmentDialog] directly from the Dashboard.
+class _GreetingHeader extends StatefulWidget {
   const _GreetingHeader({required this.userName, this.onSectionSelected});
 
   final String userName;
   final ValueChanged<AppSection>? onSectionSelected;
+
+  @override
+  State<_GreetingHeader> createState() => _GreetingHeaderState();
+}
+
+class _GreetingHeaderState extends State<_GreetingHeader> {
+  /// Opens [ScheduleAppointmentDialog] from the Dashboard greeting area.
+  ///
+  /// TODO: Once appointments come from a single Firestore source, this and
+  /// the Appointments screen will naturally stay in sync — for now they use
+  /// separate mock lists. The confirmation SnackBar is sufficient feedback
+  /// until the shared Firestore stream lands.
+  Future<void> _scheduleAppointment() async {
+    final newAppointment = await showDialog<Appointment>(
+      context: context,
+      builder: (_) => const ScheduleAppointmentDialog(),
+    );
+    if (!mounted || newAppointment == null) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Appointment scheduled.')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +148,7 @@ class _GreetingHeader extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '$greeting, ${userName.split(' ').first}',
+              '$greeting, ${widget.userName.split(' ').first}',
               style: AppTypography.textTheme.headlineMedium?.copyWith(
                 color: AppColors.textPrimary,
                 fontWeight: FontWeight.w800,
@@ -139,7 +165,7 @@ class _GreetingHeader extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             OutlinedButton.icon(
-              onPressed: () => onSectionSelected?.call(AppSection.pets),
+              onPressed: () => widget.onSectionSelected?.call(AppSection.pets),
               icon: const Icon(Icons.search, size: 17),
               label: const Text('Search Pet'),
               style: OutlinedButton.styleFrom(
@@ -150,7 +176,7 @@ class _GreetingHeader extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             FilledButton.icon(
-              onPressed: () => onSectionSelected?.call(AppSection.appointments),
+              onPressed: _scheduleAppointment,
               icon: const Icon(Icons.add, size: 17),
               label: const Text('Schedule Appointment'),
               style: FilledButton.styleFrom(

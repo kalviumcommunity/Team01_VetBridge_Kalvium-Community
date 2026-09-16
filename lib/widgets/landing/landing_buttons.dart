@@ -73,3 +73,50 @@ class LandingTextButton extends StatelessWidget {
     );
   }
 }
+
+class GlassSecondaryButton extends StatefulWidget {
+  const GlassSecondaryButton({
+    required this.label,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  State<GlassSecondaryButton> createState() => _GlassSecondaryButtonState();
+}
+
+class _GlassSecondaryButtonState extends State<GlassSecondaryButton> {
+  bool hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => hovered = true),
+      onExit: (_) => setState(() => hovered = false),
+      child: AnimatedScale(
+        scale: hovered ? 1.02 : 1,
+        duration: const Duration(milliseconds: 180),
+        child: OutlinedButton(
+          onPressed: widget.onPressed,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: LandingTheme.textPrimary,
+            side: BorderSide(
+              color: Colors.white.withValues(alpha: hovered ? .3 : .18),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          child: Text(
+            widget.label,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ),
+    );
+  }
+}

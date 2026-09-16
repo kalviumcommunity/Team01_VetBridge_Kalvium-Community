@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/landing_theme.dart';
+import 'scroll_reveal.dart';
 
 /// Responsive grid of the six core VetBridge capabilities.
 class FeaturesSection extends StatelessWidget {
@@ -72,10 +73,13 @@ class FeaturesSection extends StatelessWidget {
             mainAxisSpacing: 16,
             mainAxisExtent: 210,
           ),
-          itemBuilder: (context, index) => _FeatureCard(
-            icon: features[index].$1,
-            title: features[index].$2,
-            description: features[index].$3,
+          itemBuilder: (context, index) => ScrollReveal(
+            delay: Duration(milliseconds: index * 100),
+            child: _FeatureCard(
+              icon: features[index].$1,
+              title: features[index].$2,
+              description: features[index].$3,
+            ),
           ),
         ),
       ],
