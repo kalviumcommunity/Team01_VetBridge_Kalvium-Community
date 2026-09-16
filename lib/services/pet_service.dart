@@ -1,172 +1,70 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../models/pet.dart';
+import '../models/pet_model.dart';
+import 'firestore_service.dart';
 
-class PetService {
-  final FirebaseFirestore _firestore;
+class PetService extends FirestoreService<Pet> {
+  PetService._();
 
-  PetService({FirebaseFirestore? firestore})
-    : _firestore = firestore ?? FirebaseFirestore.instance;
+  static final PetService instance = PetService._();
+  
+  static const String _collectionPath = 'pets';
 
-  static const String collectionName = 'pets';
-
-  CollectionReference<Map<String, dynamic>> get _pets =>
-      _firestore.collection(collectionName);
-
-  // ------------------------------------------------------------
-  // CREATE PET
-  // ------------------------------------------------------------
-
-  Future<void> createPet(Pet pet) async {
-    final petId = pet.petId.trim();
-
-    if (petId.isEmpty) {
-      throw ArgumentError('Pet ID cannot be empty.');
-    }
-
-    final document = _pets.doc(petId);
-
-    final existingPet = await document.get();
-
-    if (existingPet.exists) {
-      throw StateError('A pet with ID "$petId" already exists.');
-    }
-
-    await document.set(pet.toMap());
+  /// Streams all pets from the Firestore 'pets' collection.
+  Stream<List<Pet>> streamPets() {
+    return streamCollection(_collectionPath, (id, data) {
+      data['id'] = id; // Ensure ID is mapped correctly if it's missing in data
+      return Pet.fromMap(data);
+    });
   }
 
-  // ------------------------------------------------------------
-  // GET PET BY PET ID
-  // ------------------------------------------------------------
+  /// Registers a new pet in Firestore. Generates a new ID if not provided.
+  Future<Pet> registerPet(Pet pet) async {
+    final docRef = FirebaseFirestore.instance.collection(_collectionPath).doc();
+    // In our model we have id, but we might want to ensure we use the generated one
+    final petId = pet.id.isNotEmpty && !pet.id.startsWith('mock_') ? pet.id : docRef.id;
+    
+    // We update the pet model with the correct ID and created/updated at.
+    // The Pet model has some fields, we must construct it accurately.
+    final newPet = Pet(
+      id: petId,
+      name: pet.name,
+      species: pet.species,
+      breed: pet.breed,
+      gender: pet.gender,
+      dateOfBirth: pet.dateOfBirth,
+      color: pet.color,
+      weightKg: pet.weightKg,
+      microchipId: pet.microchipId,
+      ownerName: pet.ownerName,
+      ownerPhone: pet.ownerPhone,
+      ownerEmail: pet.ownerEmail,
+      ownerAddress: pet.ownerAddress,
+      currentBranch: pet.currentBranch,
+      lastVisit: pet.lastVisit,
+      status: pet.status,
+    );
 
-  Future<Pet?> getPet(String petId) async {
-    final id = petId.trim();
-
-    if (id.isEmpty) {
-      return null;
-    }
-
-    final document = await _pets.doc(id).get();
-
-    if (!document.exists || document.data() == null) {
-      return null;
-    }
-
-    return Pet.fromMap(document.data()!);
+    await setDoc(_collectionPath, petId, newPet.toMap());
+    return newPet;
   }
 
-  // ------------------------------------------------------------
-  // UPDATE PET
-  // ------------------------------------------------------------
+  /// Fetches a specific pet by ID.
+  Future<Pet?> getPetById(String petId) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection(_collectionPath).doc(petId).get();
+      if (!doc.exists || doc.data() == null) return null;
+      final data = doc.data()!;
+      data['id'] = doc.id;
+      return Pet.fromMap(data);
+    } catch (e) {
+      throw AppDataException('Failed to get pet $petId: $e');
+    }
+  }
 
+  /// Updates an existing pet.
   Future<void> updatePet(Pet pet) async {
-    final petId = pet.petId.trim();
-
-    if (petId.isEmpty) {
-      throw ArgumentError('Pet ID cannot be empty.');
-    }
-
-    final document = _pets.doc(petId);
-
-    final existingPet = await document.get();
-
-    if (!existingPet.exists) {
-      throw StateError('Pet with ID "$petId" does not exist.');
-    }
-
-    await document.update(pet.toMap());
-  }
-
-  // ------------------------------------------------------------
-  // SEARCH BY PET NAME
-  // ------------------------------------------------------------
-
-  Future<List<Pet>> searchPetsByName(String name) async {
-    final searchName = name.trim();
-
-    if (searchName.isEmpty) {
-      return [];
-    }
-
-    final snapshot = await _pets.where('name', isEqualTo: searchName).get();
-
-    return snapshot.docs
-        .map((document) => Pet.fromMap(document.data()))
-        .toList();
-  }
-
-  // ------------------------------------------------------------
-  // SEARCH BY OWNER NAME
-  // ------------------------------------------------------------
-
-  Future<List<Pet>> searchPetsByOwnerName(String ownerName) async {
-    final searchName = ownerName.trim();
-
-    if (searchName.isEmpty) {
-      return [];
-    }
-
-    final snapshot = await _pets
-        .where('ownerName', isEqualTo: searchName)
-        .get();
-
-    return snapshot.docs
-        .map((document) => Pet.fromMap(document.data()))
-        .toList();
-  }
-
-  // ------------------------------------------------------------
-  // SEARCH BY OWNER PHONE
-  // ------------------------------------------------------------
-
-  Future<List<Pet>> searchPetsByOwnerPhone(String phone) async {
-    final searchPhone = phone.trim();
-
-    if (searchPhone.isEmpty) {
-      return [];
-    }
-
-    final snapshot = await _pets
-        .where('ownerPhone', isEqualTo: searchPhone)
-        .get();
-
-    return snapshot.docs
-        .map((document) => Pet.fromMap(document.data()))
-        .toList();
-  }
-
-  // ------------------------------------------------------------
-  // SEARCH BY MICROCHIP ID
-  // ------------------------------------------------------------
-
-  Future<Pet?> getPetByMicrochipId(String microchipId) async {
-    final chipId = microchipId.trim();
-
-    if (chipId.isEmpty) {
-      return null;
-    }
-
-    final snapshot = await _pets
-        .where('microchipId', isEqualTo: chipId)
-        .limit(1)
-        .get();
-
-    if (snapshot.docs.isEmpty) {
-      return null;
-    }
-
-    return Pet.fromMap(snapshot.docs.first.data());
-  }
-
-  // ------------------------------------------------------------
-  // GET ALL PETS
-  // ------------------------------------------------------------
-
-  Future<List<Pet>> getAllPets() async {
-    final snapshot = await _pets.get();
-
-    return snapshot.docs
-        .map((document) => Pet.fromMap(document.data()))
-        .toList();
+    final data = pet.toMap();
+    await updateDoc(_collectionPath, pet.id, data);
   }
 }

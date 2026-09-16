@@ -28,8 +28,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // TODO: Replace hardcoded profile fields with real session data from
   // AuthService/Firestore. AuthService's mock login already returns AppUser.
-  final String _role = 'Clinic Staff';
-  final String _email = 'rahul@vetbridge.com';
+  final String _role = AuthService.instance.currentUser?.roleLabel ?? 'Clinic Staff';
+  final String _email = AuthService.instance.currentUser?.email ?? 'rahul@vetbridge.com';
   final String _branch = 'North Clinic';
 
   @override

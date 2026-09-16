@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/app_typography.dart';
 import '../../models/follow_up_model.dart';
-import '../../models/pet_model.dart';
+import '../../services/follow_up_service.dart';
+import '../../services/pet_service.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/filter_tabs.dart';
 import '../../widgets/common/loading_widget.dart';
@@ -18,85 +19,157 @@ class FollowUpsScreen extends StatefulWidget {
   State<FollowUpsScreen> createState() => _FollowUpsScreenState();
 }
 
+// Follow-up filter categories — the enum itself only has pending/completed now.
+// Overdue is a derived display concept surfaced through FollowUp.isOverdue.
+enum _FollowUpFilter { all, pending, overdue, completed }
+
 class _FollowUpsScreenState extends State<FollowUpsScreen> {
-  late List<FollowUp> _followUps;
-  FollowUpStatus? _selectedStatus;
-  bool _isLoading = true;
+  _FollowUpFilter _selectedFilter = _FollowUpFilter.all;
   String? _completingId;
 
-  @override
-  void initState() {
-    super.initState();
-    _followUps = List<FollowUp>.from(mockFollowUps);
-    _loadFollowUps();
+  List<FollowUp> _filterFollowUps(List<FollowUp> allFollowUps) {
+    final items = switch (_selectedFilter) {
+      _FollowUpFilter.all => allFollowUps,
+      _FollowUpFilter.pending =>
+        allFollowUps.where((f) => f.status == FollowUpStatus.pending && !f.isOverdue).toList(),
+      // Overdue = pending AND past followUpDate
+      _FollowUpFilter.overdue => allFollowUps.where((f) => f.isOverdue).toList(),
+      _FollowUpFilter.completed =>
+        allFollowUps.where((f) => f.status == FollowUpStatus.completed).toList(),
+    };
+    return [...items]..sort((a, b) => a.followUpDate.compareTo(b.followUpDate));
   }
 
-  Future<void> _loadFollowUps() async {
-    // TODO: Replace this mock delay with a Firestore followUps stream.
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    if (mounted) setState(() => _isLoading = false);
-  }
-
-  List<FollowUp> get _filteredFollowUps {
-    final items = _followUps.where((followUp) => _selectedStatus == null || followUp.status == _selectedStatus).toList();
-    items.sort((a, b) => a.dueDate.compareTo(b.dueDate));
-    return items;
-  }
+  int _countFor(List<FollowUp> allFollowUps, _FollowUpFilter filter) => switch (filter) {
+        _FollowUpFilter.all => allFollowUps.length,
+        _FollowUpFilter.pending =>
+          allFollowUps.where((f) => f.status == FollowUpStatus.pending && !f.isOverdue).length,
+        _FollowUpFilter.overdue => allFollowUps.where((f) => f.isOverdue).length,
+        _FollowUpFilter.completed =>
+          allFollowUps.where((f) => f.status == FollowUpStatus.completed).length,
+      };
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const LoadingWidget(message: 'Loading follow-ups...');
-    final total = totalFollowUps(_followUps);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const _Header(),
-            const SizedBox(height: 20),
-            FilterTabs<FollowUpStatus>(
-              options: FollowUpStatus.values,
-              selected: _selectedStatus,
-              allLabel: 'All ($total)',
-              onChanged: (value) => setState(() => _selectedStatus = value),
-              labelBuilder: (status) => '${_statusLabel(status)} (${countFollowUps(_followUps, status)})',
+    return StreamBuilder<List<FollowUp>>(
+      stream: FollowUpService.instance.streamFollowUps(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const LoadingWidget(message: 'Loading follow-ups...');
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: EmptyState(
+              icon: Icons.error_outline,
+              title: 'Error loading follow-ups',
+              message: snapshot.error.toString(),
             ),
-            const SizedBox(height: 20),
-            if (_filteredFollowUps.isEmpty)
-              const SizedBox(height: 300, child: EmptyState(icon: Icons.event_repeat_outlined, title: 'No follow-ups found', message: 'No follow-ups match this filter.'))
-            else
-              ..._filteredFollowUps.map((followUp) => Padding(padding: const EdgeInsets.only(bottom: 14), child: FollowUpCard(followUp: followUp, isCompleting: _completingId == followUp.id, onViewPet: () => _viewPet(followUp), onMarkComplete: () => _markComplete(followUp)))),
-          ]),
-        ),
-      ),
+          );
+        }
+
+        final allFollowUps = snapshot.data ?? [];
+        final filteredFollowUps = _filterFollowUps(allFollowUps);
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 900),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                const _Header(),
+                const SizedBox(height: 20),
+                FilterTabs<_FollowUpFilter>(
+                  options: _FollowUpFilter.values,
+                  selected: _selectedFilter,
+                  allLabel: 'All (${_countFor(allFollowUps, _FollowUpFilter.all)})',
+                  onChanged: (value) => setState(() => _selectedFilter = value ?? _FollowUpFilter.all),
+                  labelBuilder: (filter) {
+                    final label = _filterLabel(filter);
+                    final count = _countFor(allFollowUps, filter);
+                    return '$label ($count)';
+                  },
+                ),
+                const SizedBox(height: 20),
+                if (filteredFollowUps.isEmpty)
+                  const SizedBox(
+                    height: 300,
+                    child: EmptyState(
+                      icon: Icons.event_repeat_outlined,
+                      title: 'No follow-ups found',
+                      message: 'No follow-ups match this filter.',
+                    ),
+                  )
+                else
+                  ...filteredFollowUps.map(
+                    (followUp) => Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: FollowUpCard(
+                        followUp: followUp,
+                        isCompleting: _completingId == followUp.id,
+                        onViewPet: () => _viewPet(followUp),
+                        onMarkComplete: () => _markComplete(followUp),
+                      ),
+                    ),
+                  ),
+              ]),
+            ),
+          ),
+        );
+      },
     );
   }
 
   Future<void> _markComplete(FollowUp followUp) async {
     setState(() => _completingId = followUp.id);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    if (!mounted) return;
-    setState(() {
-      final index = _followUps.indexWhere((item) => item.id == followUp.id);
-      if (index >= 0) {
-        final current = _followUps[index];
-        _followUps[index] = FollowUp(id: current.id, petName: current.petName, petId: current.petId, title: current.title, relatedTo: current.relatedTo, branch: current.branch, dueDate: current.dueDate, note: current.note, status: FollowUpStatus.completed);
+    
+    try {
+      final updatedFollowUp = FollowUp(
+        id: followUp.id,
+        petName: followUp.petName,
+        petId: followUp.petId,
+        reason: followUp.reason,
+        relatedTreatmentId: followUp.relatedTreatmentId,
+        followUpDate: followUp.followUpDate,
+        note: followUp.note,
+        status: FollowUpStatus.completed,
+        createdAt: followUp.createdAt,
+        updatedAt: DateTime.now(),
+      );
+      
+      await FollowUpService.instance.updateFollowUp(updatedFollowUp);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Marked as complete.')),
+        );
       }
-      _completingId = null;
-    });
-    // TODO: Persist the completed status to Firestore in the real implementation.
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked as complete.')));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _completingId = null);
+    }
   }
 
-  void _viewPet(FollowUp followUp) {
-    final pet = mockPets.where((item) => item.id == followUp.petId).firstOrNull;
+  Future<void> _viewPet(FollowUp followUp) async {
+    final pet = await PetService.instance.getPetById(followUp.petId);
+    if (!mounted) return;
+    
     if (pet == null) {
-      // TODO: Replace the local lookup with a Firestore pet fetch by petId.
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pet record could not be found.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pet record could not be found.')),
+      );
       return;
     }
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => PetDetailsScreen(pet: pet, onBack: () => Navigator.of(context).pop())));
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PetDetailsScreen(pet: pet, onBack: () => Navigator.of(context).pop()),
+      ),
+    );
   }
 }
 
@@ -104,7 +177,22 @@ class _Header extends StatelessWidget {
   const _Header();
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Follow-Ups', style: AppTypography.pageTitle), const SizedBox(height: 5), const Text('Track and manage patient follow-up schedules.', style: AppTypography.pageSubtitle)]);
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('Follow-Ups', style: AppTypography.pageTitle),
+      const SizedBox(height: 5),
+      const Text(
+        'Track and manage patient follow-up schedules.',
+        style: AppTypography.pageSubtitle,
+      ),
+    ],
+  );
 }
 
-String _statusLabel(FollowUpStatus status) => switch (status) { FollowUpStatus.pending => 'Pending', FollowUpStatus.completed => 'Completed', FollowUpStatus.overdue => 'Overdue' };
+String _filterLabel(_FollowUpFilter filter) => switch (filter) {
+      _FollowUpFilter.all => 'All',
+      _FollowUpFilter.pending => 'Pending',
+      _FollowUpFilter.overdue => 'Overdue',
+      _FollowUpFilter.completed => 'Completed',
+    };

@@ -1,3 +1,15 @@
+/// Vaccination model aligned to PRD Section 10.1.
+///
+/// Key changes vs the previous version:
+/// - `vaccineName` → `vaccine`
+/// - `administeredDate` → `administrationDate`
+/// - `branch` → `branchId`
+/// - `status` removed as a stored field — use the computed getter [computedStatus]
+/// - Added `notes`, `createdAt`, `updatedAt`
+///
+/// TODO: Replace mockVaccinations with a Firestore `vaccinations` collection query.
+library;
+
 enum VaccinationStatus { completed, dueSoon, overdue }
 
 class Vaccination {
@@ -5,141 +17,224 @@ class Vaccination {
     required this.id,
     required this.petName,
     required this.petId,
-    required this.vaccineName,
-    required this.administeredDate,
+    required this.vaccine,
+    required this.administrationDate,
     required this.nextDueDate,
-    required this.branch,
+    required this.branchId,
     required this.veterinarianName,
-    required this.status,
+    this.notes,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   final String id;
   final String petName;
   final String petId;
-  final String vaccineName;
-  final DateTime administeredDate;
+
+  /// Renamed from `vaccineName` to match PRD Section 10.1 field name.
+  final String vaccine;
+
+  /// Renamed from `administeredDate` to match PRD Section 10.1.
+  final DateTime administrationDate;
+
   final DateTime nextDueDate;
-  final String branch;
+
+  /// Renamed from `branch` to `branchId` to match PRD convention.
+  final String branchId;
+
   final String veterinarianName;
-  final VaccinationStatus status;
+  final String? notes;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  /// Computed status derived from [nextDueDate] vs today — NOT stored in Firestore.
+  ///
+  /// PRD Section 10.1 does not list `status` as a stored field.
+  VaccinationStatus get computedStatus {
+    final today = DateTime.now();
+    final todayMidnight = DateTime(today.year, today.month, today.day);
+    final dueMidnight = DateTime(
+      nextDueDate.year,
+      nextDueDate.month,
+      nextDueDate.day,
+    );
+    if (dueMidnight.isBefore(todayMidnight)) return VaccinationStatus.overdue;
+    if (dueMidnight.difference(todayMidnight).inDays <= 7) {
+      return VaccinationStatus.dueSoon;
+    }
+    return VaccinationStatus.completed;
+  }
+
+  factory Vaccination.fromMap(Map<String, dynamic> map) {
+    DateTime parseDate(dynamic val) {
+      if (val is DateTime) return val;
+      if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+      return DateTime.now();
+    }
+
+    return Vaccination(
+      id: map['id'] as String? ?? '',
+      petName: map['petName'] as String? ?? '',
+      petId: map['petId'] as String? ?? '',
+      vaccine: map['vaccine'] as String? ?? map['vaccineName'] as String? ?? '',
+      administrationDate:
+          parseDate(map['administrationDate'] ?? map['administeredDate']),
+      nextDueDate: parseDate(map['nextDueDate']),
+      branchId: map['branchId'] as String? ?? map['branch'] as String? ?? '',
+      veterinarianName: map['veterinarianName'] as String? ?? '',
+      notes: map['notes'] as String?,
+      createdAt: parseDate(map['createdAt']),
+      updatedAt: parseDate(map['updatedAt']),
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'petName': petName,
+        'petId': petId,
+        'vaccine': vaccine,
+        'administrationDate': administrationDate.toIso8601String(),
+        'nextDueDate': nextDueDate.toIso8601String(),
+        'branchId': branchId,
+        'veterinarianName': veterinarianName,
+        'notes': notes,
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+      };
 }
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
 
 DateTime _todayPlus(int days) {
   final now = DateTime.now();
   return DateTime(now.year, now.month, now.day).add(Duration(days: days));
 }
 
+// ── Mock data ─────────────────────────────────────────────────────────────────
+
 // TODO: Replace this mock list with a Firestore `vaccinations` collection query.
-// TODO: In production, compute status from nextDueDate versus today's date in a
-// computed property or backend query instead of storing it directly.
+// computedStatus is now derived from nextDueDate at runtime — no need to store
+// it or keep it in sync.
 final mockVaccinations = <Vaccination>[
   Vaccination(
     id: 'VAC-001',
     petName: 'Buddy',
     petId: 'PET-001',
-    vaccineName: 'Rabies',
-    administeredDate: _todayPlus(-365),
+    vaccine: 'Rabies',
+    administrationDate: _todayPlus(-365),
     nextDueDate: _todayPlus(30),
-    branch: 'North Clinic',
+    branchId: 'north_clinic',
     veterinarianName: 'Dr. Arjun Dev',
-    status: VaccinationStatus.completed,
+    createdAt: _todayPlus(-365),
+    updatedAt: _todayPlus(-365),
   ),
   Vaccination(
     id: 'VAC-002',
     petName: 'Buddy',
     petId: 'PET-001',
-    vaccineName: 'DHPP (Distemper, Hepatitis)',
-    administeredDate: _todayPlus(-500),
+    vaccine: 'DHPP (Distemper, Hepatitis)',
+    administrationDate: _todayPlus(-500),
     nextDueDate: _todayPlus(-20),
-    branch: 'Central Clinic',
+    branchId: 'central_clinic',
     veterinarianName: 'Dr. Ananya Krishnan',
-    status: VaccinationStatus.overdue,
+    createdAt: _todayPlus(-500),
+    updatedAt: _todayPlus(-500),
   ),
   Vaccination(
     id: 'VAC-003',
     petName: 'Luna',
     petId: 'PET-002',
-    vaccineName: 'Rabies',
-    administeredDate: _todayPlus(-350),
+    vaccine: 'Rabies',
+    administrationDate: _todayPlus(-350),
     nextDueDate: _todayPlus(5),
-    branch: 'North Clinic',
+    branchId: 'north_clinic',
     veterinarianName: 'Dr. Ananya Krishnan',
-    status: VaccinationStatus.dueSoon,
+    createdAt: _todayPlus(-350),
+    updatedAt: _todayPlus(-350),
   ),
   Vaccination(
     id: 'VAC-004',
     petName: 'Max',
     petId: 'PET-003',
-    vaccineName: 'Bordetella',
-    administeredDate: _todayPlus(-120),
+    vaccine: 'Bordetella',
+    administrationDate: _todayPlus(-120),
     nextDueDate: _todayPlus(180),
-    branch: 'South Clinic',
+    branchId: 'south_clinic',
     veterinarianName: 'Dr. Meera Pillai',
-    status: VaccinationStatus.completed,
+    createdAt: _todayPlus(-120),
+    updatedAt: _todayPlus(-120),
   ),
   Vaccination(
     id: 'VAC-005',
     petName: 'Milo',
     petId: 'PET-004',
-    vaccineName: 'Myxomatosis',
-    administeredDate: _todayPlus(-200),
+    vaccine: 'Myxomatosis',
+    administrationDate: _todayPlus(-200),
     nextDueDate: _todayPlus(4),
-    branch: 'Central Clinic',
+    branchId: 'central_clinic',
     veterinarianName: 'Dr. Meera Pillai',
-    status: VaccinationStatus.dueSoon,
+    createdAt: _todayPlus(-200),
+    updatedAt: _todayPlus(-200),
   ),
   Vaccination(
     id: 'VAC-006',
     petName: 'Bella',
     petId: 'PET-005',
-    vaccineName: 'Rabies',
-    administeredDate: _todayPlus(-390),
+    vaccine: 'Rabies',
+    administrationDate: _todayPlus(-390),
     nextDueDate: _todayPlus(-8),
-    branch: 'North Clinic',
+    branchId: 'north_clinic',
     veterinarianName: 'Dr. Ananya Krishnan',
-    status: VaccinationStatus.overdue,
+    createdAt: _todayPlus(-390),
+    updatedAt: _todayPlus(-390),
   ),
   Vaccination(
     id: 'VAC-007',
     petName: 'Coco',
     petId: 'PET-006',
-    vaccineName: 'Avian Polyomavirus',
-    administeredDate: _todayPlus(-90),
+    vaccine: 'Avian Polyomavirus',
+    administrationDate: _todayPlus(-90),
     nextDueDate: _todayPlus(120),
-    branch: 'South Clinic',
+    branchId: 'south_clinic',
     veterinarianName: 'Dr. Arjun Dev',
-    status: VaccinationStatus.completed,
+    createdAt: _todayPlus(-90),
+    updatedAt: _todayPlus(-90),
   ),
   Vaccination(
     id: 'VAC-008',
     petName: 'Luna',
     petId: 'PET-002',
-    vaccineName: 'FVRCP',
-    administeredDate: _todayPlus(-100),
+    vaccine: 'FVRCP',
+    administrationDate: _todayPlus(-100),
     nextDueDate: _todayPlus(90),
-    branch: 'North Clinic',
+    branchId: 'north_clinic',
     veterinarianName: 'Dr. Arjun Dev',
-    status: VaccinationStatus.completed,
+    createdAt: _todayPlus(-100),
+    updatedAt: _todayPlus(-100),
   ),
   Vaccination(
     id: 'VAC-009',
     petName: 'Max',
     petId: 'PET-003',
-    vaccineName: 'Rabies',
-    administeredDate: _todayPlus(-365),
+    vaccine: 'Rabies',
+    administrationDate: _todayPlus(-365),
     nextDueDate: _todayPlus(-2),
-    branch: 'South Clinic',
+    branchId: 'south_clinic',
     veterinarianName: 'Dr. Meera Pillai',
-    status: VaccinationStatus.overdue,
+    createdAt: _todayPlus(-365),
+    updatedAt: _todayPlus(-365),
   ),
 ];
 
-int countOverdueVaccinations(Iterable<Vaccination> vaccinations) => vaccinations
-    .where((vaccination) => vaccination.status == VaccinationStatus.overdue)
-    .length;
-int countDueSoonVaccinations(Iterable<Vaccination> vaccinations) => vaccinations
-    .where((vaccination) => vaccination.status == VaccinationStatus.dueSoon)
-    .length;
+// ── Count helpers (unchanged signature — use computedStatus internally) ────────
+
+int countOverdueVaccinations(Iterable<Vaccination> vaccinations) =>
+    vaccinations.where((v) => v.computedStatus == VaccinationStatus.overdue).length;
+
+int countDueSoonVaccinations(Iterable<Vaccination> vaccinations) =>
+    vaccinations.where((v) => v.computedStatus == VaccinationStatus.dueSoon).length;
+
+// ── Legacy Firestore model (kept for any existing Firestore layer code) ────────
 
 class VaccinationModel {
   final String vaccinationId;
@@ -166,7 +261,6 @@ class VaccinationModel {
     DateTime? updatedAt,
   }) : updatedAt = updatedAt ?? createdAt;
 
-  /// Factory constructor to create a VaccinationModel from a map.
   factory VaccinationModel.fromMap(Map<String, dynamic> map) {
     DateTime? parseDateTime(dynamic val) {
       if (val == null) return null;
@@ -182,18 +276,13 @@ class VaccinationModel {
       return null;
     }
 
-    final vaccineStr =
-        map['vaccineName'] as String? ?? map['vaccine'] as String? ?? '';
-    final adminDate =
-        parseDateTime(map['dateAdministered']) ??
-        parseDateTime(map['date']) ??
-        DateTime.now();
-
     return VaccinationModel(
       vaccinationId: map['vaccinationId'] as String? ?? '',
       petId: map['petId'] as String? ?? '',
-      vaccineName: vaccineStr,
-      dateAdministered: adminDate,
+      vaccineName: map['vaccine'] as String? ?? map['vaccineName'] as String? ?? '',
+      dateAdministered:
+          parseDateTime(map['administrationDate'] ?? map['dateAdministered']) ??
+          DateTime.now(),
       nextDueDate: parseDateTime(map['nextDueDate']),
       notes: map['notes'] as String? ?? '',
       vetId: map['vetId'] as String? ?? '',
@@ -203,50 +292,16 @@ class VaccinationModel {
     );
   }
 
-  /// Converts the VaccinationModel instance into a map structure.
-  Map<String, dynamic> toMap() {
-    return {
-      'vaccinationId': vaccinationId,
-      'petId': petId,
-      'vaccineName': vaccineName,
-      'vaccine': vaccineName,
-      'dateAdministered': dateAdministered.toIso8601String(),
-      'date': dateAdministered.toIso8601String(),
-      'nextDueDate': nextDueDate?.toIso8601String(),
-      'notes': notes,
-      'vetId': vetId,
-      'branchId': branchId,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
-    };
-  }
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-
-    return other is VaccinationModel &&
-        other.vaccinationId == vaccinationId &&
-        other.petId == petId &&
-        other.vaccineName == vaccineName &&
-        other.dateAdministered == dateAdministered &&
-        other.nextDueDate == nextDueDate &&
-        other.notes == notes &&
-        other.vetId == vetId &&
-        other.branchId == branchId &&
-        other.createdAt == createdAt;
-  }
-
-  @override
-  int get hashCode {
-    return vaccinationId.hashCode ^
-        petId.hashCode ^
-        vaccineName.hashCode ^
-        dateAdministered.hashCode ^
-        nextDueDate.hashCode ^
-        notes.hashCode ^
-        vetId.hashCode ^
-        branchId.hashCode ^
-        createdAt.hashCode;
-  }
+  Map<String, dynamic> toMap() => {
+        'vaccinationId': vaccinationId,
+        'petId': petId,
+        'vaccine': vaccineName,
+        'administrationDate': dateAdministered.toIso8601String(),
+        'nextDueDate': nextDueDate?.toIso8601String(),
+        'notes': notes,
+        'vetId': vetId,
+        'branchId': branchId,
+        'createdAt': createdAt.toIso8601String(),
+        'updatedAt': updatedAt.toIso8601String(),
+      };
 }

@@ -3,12 +3,17 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_glass_theme.dart';
 import '../../models/follow_up_model.dart';
-import '../common/branch_badge.dart';
 import '../common/primary_button.dart';
 import '../common/status_badge.dart';
 
 class FollowUpCard extends StatelessWidget {
-  const FollowUpCard({required this.followUp, required this.onViewPet, required this.onMarkComplete, super.key, this.isCompleting = false});
+  const FollowUpCard({
+    required this.followUp,
+    required this.onViewPet,
+    required this.onMarkComplete,
+    super.key,
+    this.isCompleting = false,
+  });
 
   final FollowUp followUp;
   final VoidCallback onViewPet;
@@ -17,31 +22,119 @@ class FollowUpCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _statusColor(followUp.status);
+    // Derive effective status for display: overdue items show as danger even
+    // though their stored status is still `pending`.
+    final effectiveColor = _statusColor(followUp);
+    final effectiveLabel = _statusLabel(followUp);
     final canComplete = followUp.status != FollowUpStatus.completed;
+
     return LightGlassPanel(
       padding: EdgeInsets.zero,
       child: Container(
-        decoration: BoxDecoration(border: Border(left: BorderSide(color: color, width: 4))),
+        decoration:
+            BoxDecoration(border: Border(left: BorderSide(color: effectiveColor, width: 4))),
         padding: const EdgeInsets.fromLTRB(16, 15, 16, 15),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [Expanded(child: Text(followUp.petName, style: const TextStyle(color: AppColors.textPrimary, fontSize: 15, fontWeight: FontWeight.w800))), StatusBadge(label: _statusLabel(followUp.status), color: color, backgroundColor: color.withValues(alpha: .10))]),
+          Row(children: [
+            Expanded(
+              child: Text(
+                followUp.petName,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            StatusBadge(
+              label: effectiveLabel,
+              color: effectiveColor,
+              backgroundColor: effectiveColor.withValues(alpha: .10),
+            ),
+          ]),
           const SizedBox(height: 9),
-          Text(followUp.title, style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 5),
-          Text('Related: ${followUp.relatedTo}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+          // `reason` is the PRD-aligned field name (was `title`)
+          Text(
+            followUp.reason,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (followUp.relatedTreatmentId != null) ...[
+            const SizedBox(height: 5),
+            Text(
+              'Related treatment: ${followUp.relatedTreatmentId}',
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+            ),
+          ],
           const SizedBox(height: 12),
-          Wrap(spacing: 12, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [BranchBadge(branchName: followUp.branch), Text('Due ${_formatDate(followUp.dueDate)}', style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700))]),
-          if (followUp.note != null) ...[const SizedBox(height: 10), Text(followUp.note!, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontStyle: FontStyle.italic))],
+          Text(
+            'Due ${_formatDate(followUp.followUpDate)}',
+            style: TextStyle(
+              color: effectiveColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (followUp.note != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              followUp.note!,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
-          Wrap(alignment: WrapAlignment.end, spacing: 10, runSpacing: 8, children: [SizedBox(width: 112, child: SecondaryButton(label: 'View Pet', onPressed: isCompleting ? null : onViewPet)), if (canComplete) SizedBox(width: 142, child: PrimaryButton(label: 'Mark Complete', loadingLabel: 'Saving...', isLoading: isCompleting, onPressed: onMarkComplete))]),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              SizedBox(
+                width: 112,
+                child: SecondaryButton(
+                  label: 'View Pet',
+                  onPressed: isCompleting ? null : onViewPet,
+                ),
+              ),
+              if (canComplete)
+                SizedBox(
+                  width: 142,
+                  child: PrimaryButton(
+                    label: 'Mark Complete',
+                    loadingLabel: 'Saving...',
+                    isLoading: isCompleting,
+                    onPressed: onMarkComplete,
+                  ),
+                ),
+            ],
+          ),
         ]),
       ),
     );
   }
 }
 
-Color _statusColor(FollowUpStatus status) => switch (status) { FollowUpStatus.pending => AppColors.statusWarning, FollowUpStatus.completed => AppColors.statusSuccess, FollowUpStatus.overdue => AppColors.statusDanger };
-String _statusLabel(FollowUpStatus status) => switch (status) { FollowUpStatus.pending => 'Pending', FollowUpStatus.completed => 'Completed', FollowUpStatus.overdue => 'Overdue' };
-String _formatDate(DateTime date) => '${date.day.toString().padLeft(2, '0')} ${_month(date.month)} ${date.year}';
-String _month(int month) => const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1];
+/// Derives display color from the follow-up, considering [isOverdue].
+Color _statusColor(FollowUp followUp) {
+  if (followUp.status == FollowUpStatus.completed) return AppColors.statusSuccess;
+  if (followUp.isOverdue) return AppColors.statusDanger;
+  return AppColors.statusWarning;
+}
+
+/// Derives display label from the follow-up, considering [isOverdue].
+String _statusLabel(FollowUp followUp) {
+  if (followUp.status == FollowUpStatus.completed) return 'Completed';
+  if (followUp.isOverdue) return 'Overdue';
+  return 'Pending';
+}
+
+String _formatDate(DateTime date) =>
+    '${date.day.toString().padLeft(2, '0')} ${_month(date.month)} ${date.year}';
+String _month(int month) =>
+    const ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1];

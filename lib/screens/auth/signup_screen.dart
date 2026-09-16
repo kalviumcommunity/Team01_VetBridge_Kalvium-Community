@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/auth/auth_split_shell.dart';
 import '../../widgets/common/custom_text_field.dart';
@@ -25,6 +26,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _confirmPasswordController = TextEditingController();
   String? _clinic;
   String? _branch;
+  UserRole? _role;
   bool _termsAccepted = false;
   bool _isLoading = false;
   String? _errorMessage;
@@ -64,6 +66,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
             const SizedBox(height: 14),
             CustomDropdownField<String>(label: 'Branch', value: _branch, prefixIcon: Icons.location_on_outlined, items: const [DropdownMenuItem(value: 'central_clinic', child: Text('Central Clinic')), DropdownMenuItem(value: 'north_clinic', child: Text('North Clinic')), DropdownMenuItem(value: 'south_clinic', child: Text('South Clinic'))], onChanged: (value) => setState(() => _branch = value), validator: (value) => value == null ? 'Select a branch' : null),
             const SizedBox(height: 14),
+            CustomDropdownField<UserRole>(label: 'Role', value: _role, prefixIcon: Icons.badge_outlined, items: const [DropdownMenuItem(value: UserRole.veterinarian, child: Text('Veterinarian')), DropdownMenuItem(value: UserRole.clinicStaff, child: Text('Clinic Staff'))], onChanged: (value) => setState(() => _role = value), validator: (value) => value == null ? 'Select a role' : null),
+            const SizedBox(height: 14),
             CustomTextField(label: 'Password', controller: _passwordController, prefixIcon: Icons.lock_outline, obscureText: true, textInputAction: TextInputAction.next, autofillHints: const [AutofillHints.newPassword], validator: _passwordValidator),
             const SizedBox(height: 14),
             CustomTextField(label: 'Confirm Password', controller: _confirmPasswordController, prefixIcon: Icons.lock_outline, obscureText: true, textInputAction: TextInputAction.done, autofillHints: const [AutofillHints.newPassword], validator: (value) {
@@ -101,7 +105,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
     setState(() => _isLoading = true);
     try {
-      await AuthService.instance.signUp(fullName: _fullNameController.text, email: _emailController.text, phone: _phoneController.text, clinicId: _clinic!, branchId: _branch!, password: _passwordController.text);
+      await AuthService.instance.signUp(fullName: _fullNameController.text, email: _emailController.text, phone: _phoneController.text, clinicId: _clinic!, branchId: _branch!, password: _passwordController.text, role: _role!);
       if (mounted) widget.onSignUpSuccess();
     } on AuthException catch (exception) {
       if (mounted) setState(() => _errorMessage = exception.message);
