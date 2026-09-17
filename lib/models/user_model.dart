@@ -1,20 +1,20 @@
 /// Enumerated user roles matching PRD Section 7 exactly.
 ///
-/// Stored in Firestore as a string: 'veterinarian' or 'clinicStaff'.
-enum UserRole { veterinarian, clinicStaff }
+/// Stored in Firestore as a string: 'veterinarian' or 'staff'.
+enum UserRole { veterinarian, staff }
 
-/// Converts a Firestore string to a [UserRole]. Falls back to [UserRole.clinicStaff].
+/// Converts a Firestore string to a [UserRole].
 UserRole userRoleFromString(String? value) => switch (value) {
-      'veterinarian' => UserRole.veterinarian,
-      'clinicStaff' => UserRole.clinicStaff,
-      _ => UserRole.clinicStaff,
-    };
+  'veterinarian' => UserRole.veterinarian,
+  'staff' => UserRole.staff,
+  _ => throw FormatException('Invalid user role: $value'),
+};
 
 /// Converts a [UserRole] to its Firestore string form.
 String userRoleToString(UserRole role) => switch (role) {
-      UserRole.veterinarian => 'veterinarian',
-      UserRole.clinicStaff => 'clinicStaff',
-    };
+  UserRole.veterinarian => 'veterinarian',
+  UserRole.staff => 'staff',
+};
 
 // Legacy model — kept for any Firestore-layer usages that reference it by name.
 // Prefer AppUser for all application-layer logic.
@@ -66,7 +66,11 @@ class UserModel {
 
   @override
   int get hashCode =>
-      userId.hashCode ^ name.hashCode ^ email.hashCode ^ role.hashCode ^ branchId.hashCode;
+      userId.hashCode ^
+      name.hashCode ^
+      email.hashCode ^
+      role.hashCode ^
+      branchId.hashCode;
 }
 
 /// User profile shape shared by authentication and future Firestore storage.
@@ -96,9 +100,9 @@ class AppUser {
 
   /// Human-readable label for display in Profile, sign-up, etc.
   String get roleLabel => switch (role) {
-        UserRole.veterinarian => 'Veterinarian',
-        UserRole.clinicStaff => 'Clinic Staff',
-      };
+    UserRole.veterinarian => 'Veterinarian',
+    UserRole.staff => 'Staff',
+  };
 
   factory AppUser.fromMap(Map<String, dynamic> map) {
     final createdAt = map['createdAt'];

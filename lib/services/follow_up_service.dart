@@ -6,7 +6,7 @@ class FollowUpService extends FirestoreService<FollowUp> {
 
   static final FollowUpService instance = FollowUpService._();
 
-  static const String _collectionPath = 'follow_ups';
+  static const String _collectionPath = 'followUps';
 
   /// Streams all follow-ups from Firestore.
   Stream<List<FollowUp>> streamFollowUps() {

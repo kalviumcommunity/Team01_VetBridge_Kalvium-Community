@@ -83,7 +83,7 @@ class AuthService {
       );
 
       // Write to /users/{uid} — role is serialized as 'veterinarian' or
-      // 'clinicStaff' (matches firestore.rules getRole() check exactly).
+      // 'staff' to match the Firestore security rules.
       await _db.collection(_usersCollection).doc(uid).set(user.toMap());
 
       _currentUser = user;
@@ -155,16 +155,14 @@ class AuthService {
 
   /// Maps Firebase Auth error codes to user-friendly messages.
   String _authMessage(String code) => switch (code) {
-        'email-already-in-use' => 'An account already exists for that email.',
-        'invalid-email' => 'The email address is not valid.',
-        'user-not-found' => 'No account found for that email.',
-        'wrong-password' => 'The password is incorrect.',
-        'weak-password' => 'Password must be at least 6 characters.',
-        'too-many-requests' =>
-          'Too many failed attempts. Please try again later.',
-        'network-request-failed' =>
-          'Network error. Please check your connection.',
-        'invalid-credential' => 'Invalid email or password.',
-        _ => 'Authentication error ($code). Please try again.',
-      };
+    'email-already-in-use' => 'An account already exists for that email.',
+    'invalid-email' => 'The email address is not valid.',
+    'user-not-found' => 'No account found for that email.',
+    'wrong-password' => 'The password is incorrect.',
+    'weak-password' => 'Password must be at least 6 characters.',
+    'too-many-requests' => 'Too many failed attempts. Please try again later.',
+    'network-request-failed' => 'Network error. Please check your connection.',
+    'invalid-credential' => 'Invalid email or password.',
+    _ => 'Authentication error ($code). Please try again.',
+  };
 }
