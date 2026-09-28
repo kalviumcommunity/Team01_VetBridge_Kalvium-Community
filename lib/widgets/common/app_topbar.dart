@@ -52,12 +52,16 @@ class _AppTopBarState extends State<AppTopBar> {
     super.initState();
     // Start from a fresh copy of the mock list so mutations stay local to
     // this widget instance and don't bleed into the global mock.
-    _notifications = mockNotifications.map((n) => n.markRead()..isRead = n.isRead).toList();
+    _notifications = mockNotifications
+        .map((n) => n.markRead()..isRead = n.isRead)
+        .toList();
   }
 
   @override
   void dispose() {
-    _closePanel();
+    final overlayEntry = _overlayEntry;
+    _overlayEntry = null;
+    overlayEntry?.remove();
     super.dispose();
   }
 
@@ -257,7 +261,9 @@ class _NotificationButton extends StatelessWidget {
             tooltip: 'Notifications',
             onPressed: onTap,
             icon: Icon(
-              isOpen ? Icons.notifications_rounded : Icons.notifications_none_outlined,
+              isOpen
+                  ? Icons.notifications_rounded
+                  : Icons.notifications_none_outlined,
               color: isOpen ? AppColors.primary : null,
             ),
           ),
@@ -267,12 +273,18 @@ class _NotificationButton extends StatelessWidget {
               right: 6,
               child: IgnorePointer(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 1,
+                  ),
                   decoration: const BoxDecoration(
                     color: Color(0xFFE55353),
                     borderRadius: BorderRadius.all(Radius.circular(10)),
                   ),
-                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
                   child: Text(
                     '$unreadCount',
                     style: const TextStyle(
@@ -312,12 +324,23 @@ class _UserMenu extends StatelessWidget {
             backgroundColor: AppColors.mint,
             child: Text(
               initials,
-              style: const TextStyle(color: AppColors.tealDark, fontSize: 11, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                color: AppColors.tealDark,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
           if (MediaQuery.sizeOf(context).width >= 760) ...[
             const SizedBox(width: 8),
-            Text(name, style: const TextStyle(color: AppColors.ink, fontSize: 13, fontWeight: FontWeight.w600)),
+            Text(
+              name,
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const Icon(Icons.keyboard_arrow_down, size: 17),
           ],
         ],

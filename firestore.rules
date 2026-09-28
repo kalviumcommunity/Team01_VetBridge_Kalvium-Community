@@ -3,99 +3,133 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ─────────────────────────────────────────────────────────────
-    // Helper functions
-    // ─────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────
+    // Authentication helpers
+    // ─────────────────────────────────────────────
 
-    /// Returns true if the request is from a signed-in user.
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
-    /// Reads the current user's role string from their /users/{uid} document.
-    /// IMPORTANT: This must match AppUser.toMap() serialization exactly:
-    ///   UserRole.veterinarian  → 'veterinarian'
-    ///   UserRole.clinicStaff   → 'clinicStaff'
-    function getRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
     function isVeterinarian() {
-      return isAuthenticated() && getRole() == 'veterinarian';
+      return isSignedIn()
+          && get(
+               /databases/$(database)/documents/users/$(request.auth.uid)
+             ).data.role == 'veterinarian';
     }
 
-    function isClinicStaff() {
-      return isAuthenticated() && (getRole() == 'clinicStaff' || getRole() == 'veterinarian');
+    function isStaff() {
+      return isSignedIn()
+          && get(
+               /databases/$(database)/documents/users/$(request.auth.uid)
+             ).data.role == 'staff';
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // /users/{uid}
-    // Any authenticated user may read/write their OWN document.
-    // Reads of other users' profiles are not needed in this app.
-    // ─────────────────────────────────────────────────────────────
-    match /users/{uid} {
-      allow read, write: if isAuthenticated() && request.auth.uid == uid;
+    function isClinicUser() {
+      return isVeterinarian() || isStaff();
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // /pets/{petId}
-    // Any authenticated clinic user may read all pets.
-    // Only veterinarians may create/update/delete pets.
-    // ─────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────
+    // USERS
+    // ─────────────────────────────────────────────
+
+    match /users/{userId} {
+
+      // A logged-in user can read their own profile.
+      allow read: if isSignedIn()
+                  && request.auth.uid == userId;
+
+      // User profiles are managed through Firebase/Admin.
+      allow write: if false;
+    }
+
+
+    // ─────────────────────────────────────────────
+    // PETS
+    // ─────────────────────────────────────────────
+
     match /pets/{petId} {
-      allow read: if isClinicStaff();
+
+      // Both veterinarian and staff can search/view pets.
+      allow read: if isClinicUser();
+
+      // Staff registers and updates basic pet information.
+      // Veterinarian can also create/update when needed.
+      allow create, update: if isClinicUser();
+
+      // Pets should not be deleted from the app.
+      allow delete: if false;
+    }
+
+
+    // ─────────────────────────────────────────────
+    // CLINICS
+    // ─────────────────────────────────────────────
+
+    match /clinics/{branchId} {
+
+      // Both roles can see clinic/branch information.
+      allow read: if isClinicUser();
+
+      // Managed by administrator/Firebase Console.
+      allow create, update, delete: if false;
+    }
+
+
+    // ─────────────────────────────────────────────
+    // TREATMENTS
+    // ─────────────────────────────────────────────
+
+    match /treatments/{treatmentId} {
+
+      // Both roles can view medical history.
+      allow read: if isClinicUser();
+
+      // Only veterinarian can create/update/delete treatments.
       allow create, update, delete: if isVeterinarian();
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // /clinics/{clinicId}
-    // Read-only for all authenticated users.
-    // Write access is admin-only (handled outside the app).
-    // ─────────────────────────────────────────────────────────────
-    match /clinics/{clinicId} {
-      allow read: if isClinicStaff();
-      allow write: if false; // Managed via Firebase Console / admin SDK only
-    }
 
-    // ─────────────────────────────────────────────────────────────
-    // /treatments/{treatmentId}
-    // Read-only in the app (seeded manually in Firebase Console).
-    // ─────────────────────────────────────────────────────────────
-    match /treatments/{treatmentId} {
-      allow read: if isClinicStaff();
-      allow write: if false; // Seeded manually — not written from the app
-    }
+    // ─────────────────────────────────────────────
+    // VACCINATIONS
+    // ─────────────────────────────────────────────
 
-    // ─────────────────────────────────────────────────────────────
-    // /vaccinations/{vaccinationId}
-    // Read-only in the app (seeded manually in Firebase Console).
-    // ─────────────────────────────────────────────────────────────
     match /vaccinations/{vaccinationId} {
-      allow read: if isClinicStaff();
-      allow write: if false; // Seeded manually — not written from the app
+
+      // Both roles can view vaccination history.
+      allow read: if isClinicUser();
+
+      // Only veterinarian can manage vaccinations.
+      allow create, update, delete: if isVeterinarian();
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // /follow_ups/{followUpId}
-    // Both roles can read.
-    // Only veterinarians may update (e.g. mark as complete).
-    // Seeded manually — no create/delete from the app.
-    // ─────────────────────────────────────────────────────────────
-    match /follow_ups/{followUpId} {
-      allow read: if isClinicStaff();
-      allow update: if isVeterinarian();
-      allow create, delete: if false; // Seeded manually
+
+    // ─────────────────────────────────────────────
+    // FOLLOW-UPS
+    // ─────────────────────────────────────────────
+
+    match /followUps/{followUpId} {
+
+      // Both roles can view follow-ups.
+      allow read: if isClinicUser();
+
+      // Veterinarian creates and updates follow-ups.
+      allow create, update, delete: if isVeterinarian();
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // /appointments/{appointmentId}
-    // Both roles can read and create (scheduling a new appointment).
-    // Only veterinarians may update or cancel appointments.
-    // ─────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────
+    // APPOINTMENTS
+    // ─────────────────────────────────────────────
+
     match /appointments/{appointmentId} {
-      allow read: if isClinicStaff();
-      allow create: if isClinicStaff();
-      allow update, delete: if isVeterinarian();
+
+      // Both roles can view appointments.
+      allow read: if isClinicUser();
+
+      // Clinic staff schedules appointments.
+      allow create, update, delete: if isStaff();
     }
   }
 }
