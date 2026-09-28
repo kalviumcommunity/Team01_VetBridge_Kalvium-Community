@@ -47,19 +47,25 @@ class _PetsScreenState extends State<PetsScreen> {
       child: StreamBuilder<List<Pet>>(
         stream: PetService.instance.streamPets(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          // Show spinner while connecting or waiting for first event.
+          if (snapshot.connectionState == ConnectionState.waiting ||
+              snapshot.connectionState == ConnectionState.none) {
             return const LoadingWidget(message: 'Loading pets...');
           }
+          // Show a readable error — never a silent white screen.
           if (snapshot.hasError) {
             return Center(
-              child: EmptyState(
-                icon: Icons.error_outline,
-                title: 'Error loading pets',
-                message: snapshot.error.toString(),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: EmptyState(
+                  icon: Icons.error_outline,
+                  title: 'Error loading pets',
+                  message: snapshot.error.toString(),
+                ),
               ),
             );
           }
-          
+
           final allPets = snapshot.data ?? [];
           final filteredPets = _filterPets(allPets);
 
@@ -159,14 +165,51 @@ class _FilterBar extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final stacked = constraints.maxWidth < 650;
-          final fields = [
-            Expanded(child: SearchField(controller: controller, hint: 'Search by Pet ID, name, owner, phone or microchip ID', onChanged: onSearchChanged)),
-            _FilterDropdown(value: species, items: const ['All', 'Dog', 'Cat', 'Rabbit', 'Bird', 'Other'], onChanged: onSpeciesChanged),
-            _FilterDropdown(value: status, items: const ['All', 'Active', 'Inactive'], onChanged: onStatusChanged),
-          ];
-          return stacked
-              ? Column(children: [fields[0], const SizedBox(height: 10), Row(children: [Expanded(child: fields[1]), const SizedBox(width: 10), Expanded(child: fields[2])])])
-              : Row(children: [fields[0], const SizedBox(width: 12), fields[1], const SizedBox(width: 12), fields[2]]);
+
+          // ── Desktop / wide layout ────────────────────────────────────────
+          // Expanded is valid here because Row has bounded horizontal space.
+          if (!stacked) {
+            return Row(
+              children: [
+                Expanded(
+                  child: SearchField(
+                    controller: controller,
+                    hint: 'Search by Pet ID, name, owner, phone or microchip ID',
+                    onChanged: onSearchChanged,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _FilterDropdown(value: species, items: const ['All', 'Dog', 'Cat', 'Rabbit', 'Bird', 'Other'], onChanged: onSpeciesChanged),
+                const SizedBox(width: 12),
+                _FilterDropdown(value: status, items: const ['All', 'Active', 'Inactive'], onChanged: onStatusChanged),
+              ],
+            );
+          }
+
+          // ── Mobile / stacked layout ───────────────────────────────────────
+          // Do NOT use Expanded inside this Column: the Column is nested inside
+          // a SingleChildScrollView which gives unbounded vertical constraints,
+          // and Expanded with non-zero flex inside an unbounded Column throws
+          // "RenderFlex children have non-zero flex but incoming height
+          // constraints are unbounded." — the root cause of the blank screen.
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SearchField(
+                controller: controller,
+                hint: 'Search by Pet ID, name, owner, phone or microchip ID',
+                onChanged: onSearchChanged,
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(child: _FilterDropdown(value: species, items: const ['All', 'Dog', 'Cat', 'Rabbit', 'Bird', 'Other'], onChanged: onSpeciesChanged)),
+                  const SizedBox(width: 10),
+                  Expanded(child: _FilterDropdown(value: status, items: const ['All', 'Active', 'Inactive'], onChanged: onStatusChanged)),
+                ],
+              ),
+            ],
+          );
         },
       ),
     );
