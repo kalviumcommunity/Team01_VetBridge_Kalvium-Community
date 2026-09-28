@@ -5,6 +5,7 @@ class AppSpacing {
   static const mobileBreakpoint = 600.0;
   static const tabletBreakpoint = 1024.0;
   static const pagePadding = 24.0;
+  static const sm = 8.0;
   static const lg = 24.0;
   static const sectionGap = 120.0;
   static const radius = 20.0;

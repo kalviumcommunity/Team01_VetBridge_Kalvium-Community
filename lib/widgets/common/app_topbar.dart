@@ -105,7 +105,9 @@ class _AppTopBarState extends State<AppTopBar> {
 
   @override
   Widget build(BuildContext context) {
-    final narrow = MediaQuery.sizeOf(context).width < 700;
+    final width = MediaQuery.sizeOf(context).width;
+    final narrow = width < 700;
+    final veryNarrow = width < 400;
     return Container(
       height: widget.preferredSize.height,
       decoration: const BoxDecoration(
@@ -116,24 +118,28 @@ class _AppTopBarState extends State<AppTopBar> {
       child: Row(
         children: [
           if (widget.showMenuButton) ...[
-            IconButton(
-              tooltip: 'Open navigation',
-              onPressed: widget.onMenuTap,
-              icon: const Icon(Icons.menu_rounded),
+            SizedBox(
+              width: 48,
+              height: 48,
+              child: IconButton(
+                tooltip: 'Open navigation',
+                onPressed: widget.onMenuTap,
+                icon: const Icon(Icons.menu_rounded),
+              ),
             ),
             const SizedBox(width: 4),
           ],
           Expanded(child: narrow ? _SearchIconButton() : const _SearchField()),
-          const SizedBox(width: 16),
-          _BranchSelector(branch: widget.currentBranch),
-          const SizedBox(width: 14),
+          const SizedBox(width: 8),
+          _BranchSelector(branch: widget.currentBranch, labelVisible: !veryNarrow),
+          const SizedBox(width: 8),
           _NotificationButton(
             layerLink: _bellLayerLink,
             unreadCount: _unreadCount,
             isOpen: _panelOpen,
             onTap: _togglePanel,
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 8),
           _UserMenu(name: widget.userName, initials: widget.userInitials),
         ],
       ),
@@ -188,9 +194,10 @@ class _SearchIconButton extends StatelessWidget {
 }
 
 class _BranchSelector extends StatelessWidget {
-  const _BranchSelector({required this.branch});
+  const _BranchSelector({required this.branch, this.labelVisible = true});
 
   final String branch;
+  final bool labelVisible;
 
   @override
   Widget build(BuildContext context) {
@@ -209,10 +216,12 @@ class _BranchSelector extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.circle, color: AppColors.primary, size: 7),
-            const SizedBox(width: 6),
-            Text(branch, style: const TextStyle(fontSize: 12, color: AppColors.ink)),
-            const SizedBox(width: 2),
-            const Icon(Icons.keyboard_arrow_down, size: 16),
+            if (labelVisible) ...[
+              const SizedBox(width: 6),
+              Text(branch, style: const TextStyle(fontSize: 12, color: AppColors.ink)),
+              const SizedBox(width: 2),
+              const Icon(Icons.keyboard_arrow_down, size: 16),
+            ],
           ],
         ),
       ),

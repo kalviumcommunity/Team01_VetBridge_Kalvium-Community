@@ -236,13 +236,15 @@ class _DashboardContent extends StatelessWidget {
                 ],
               );
             }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: _AppointmentsCard(appointments: data.appointments, onViewAll: () => onSectionSelected?.call(AppSection.appointments))),
-                const SizedBox(width: 20),
-                Expanded(child: _FollowUpsCard(followUps: data.followUps, onViewAll: () => onSectionSelected?.call(AppSection.followUps))),
-              ],
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: _AppointmentsCard(appointments: data.appointments, onViewAll: () => onSectionSelected?.call(AppSection.appointments))),
+                  const SizedBox(width: 20),
+                  Expanded(child: _FollowUpsCard(followUps: data.followUps, onViewAll: () => onSectionSelected?.call(AppSection.followUps))),
+                ],
+              ),
             );
           },
         ),
@@ -307,30 +309,41 @@ class _GreetingHeaderState extends State<_GreetingHeader> {
             ),
           ],
         ),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            OutlinedButton.icon(
-              onPressed: () => widget.onSectionSelected?.call(AppSection.pets),
-              icon: const Icon(Icons.search, size: 17),
-              label: const Text('Search Pet'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: BorderSide(color: AppColors.border.withValues(alpha: .8)),
-                backgroundColor: Colors.white.withValues(alpha: .55),
-              ),
-            ),
-            const SizedBox(width: 10),
-            FilledButton.icon(
-              onPressed: _scheduleAppointment,
-              icon: const Icon(Icons.add, size: 17),
-              label: const Text('Schedule Appointment'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = MediaQuery.sizeOf(context).width < 600;
+            return Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                SizedBox(
+                  width: isMobile ? double.infinity : null,
+                  child: OutlinedButton.icon(
+                    onPressed: () => widget.onSectionSelected?.call(AppSection.pets),
+                    icon: const Icon(Icons.search, size: 17),
+                    label: const Flexible(child: Text('Search Pet', maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: BorderSide(color: AppColors.border.withValues(alpha: .8)),
+                      backgroundColor: Colors.white.withValues(alpha: .55),
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: isMobile ? double.infinity : null,
+                  child: FilledButton.icon(
+                    onPressed: _scheduleAppointment,
+                    icon: const Icon(Icons.add, size: 17),
+                    label: const Flexible(child: Text('Schedule Appointment', maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -417,7 +430,7 @@ class _AppointmentsCard extends StatelessWidget {
       action: 'View all',
       onAction: onViewAll,
       child: appointments.isEmpty
-          ? const SizedBox(height: 120, child: EmptyState(icon: Icons.event_available_outlined, title: 'No appointments today', message: 'There are no appointments scheduled for today.'))
+          ? const EmptyState(compact: true, icon: Icons.event_available_outlined, title: 'No appointments today', message: 'There are no appointments scheduled for today.')
           : Column(children: appointments.map((appointment) => _AppointmentRow(appointment: appointment)).toList()),
     );
   }
@@ -479,7 +492,7 @@ class _FollowUpsCard extends StatelessWidget {
       action: 'View all',
       onAction: onViewAll,
       child: followUps.isEmpty
-          ? const SizedBox(height: 120, child: EmptyState(icon: Icons.event_repeat_outlined, title: 'No upcoming follow-ups', message: 'There are no follow-ups to show.'))
+          ? const EmptyState(compact: true, icon: Icons.event_repeat_outlined, title: 'No upcoming follow-ups', message: 'There are no follow-ups to show.')
           : Column(children: followUps.map((followUp) => _FollowUpRow(followUp: followUp)).toList()),
     );
   }
@@ -535,7 +548,7 @@ class _RecentPetsCard extends StatelessWidget {
       action: 'View all',
       onAction: onViewAll,
       child: pets.isEmpty
-          ? const SizedBox(height: 120, child: EmptyState(icon: Icons.pets_outlined, title: 'No recently registered pets', message: 'Newly registered pets will appear here.'))
+          ? const EmptyState(compact: true, icon: Icons.pets_outlined, title: 'No recently registered pets', message: 'Newly registered pets will appear here.')
           : Column(children: pets.map((pet) => _PetRow(pet: pet)).toList()),
     );
   }
@@ -548,6 +561,32 @@ class _PetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    if (isMobile) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                PetAvatar(species: pet.species, size: 34),
+                const SizedBox(width: 10),
+                Expanded(child: _PetInfo(label: pet.name, value: pet.ownerName)),
+                const SizedBox(width: 10),
+                StatusBadge(label: pet.status, color: AppColors.statusSuccess, backgroundColor: AppColors.statusSuccess.withValues(alpha: .10)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(child: _PetInfo(label: pet.species, value: pet.breed)),
+                Expanded(child: _PetInfo(label: 'Last visit', value: pet.lastVisit)),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
