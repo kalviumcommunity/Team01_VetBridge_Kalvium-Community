@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/constants/nav_items.dart';
 import '../../core/theme/app_colors.dart';
@@ -61,15 +62,37 @@ class _AppShellState extends State<AppShell> {
   }
 
   Widget _buildMobileLayout() {
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: AppColors.background,
-      drawer: MobileDrawer(
-        currentSection: _currentSection,
-        onSectionSelected: _selectSection,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      appBar: _topBar(showMenuButton: true),
-      body: _content(),
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: AppColors.background,
+        drawer: MobileDrawer(
+          currentSection: _currentSection,
+          onSectionSelected: _selectSection,
+        ),
+        body: Column(
+          children: [
+            Container(
+              color: Colors.white,
+              child: SafeArea(
+                bottom: false,
+                child: _topBar(showMenuButton: true),
+              ),
+            ),
+            Expanded(
+              child: SafeArea(
+                top: false,
+                child: _content(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

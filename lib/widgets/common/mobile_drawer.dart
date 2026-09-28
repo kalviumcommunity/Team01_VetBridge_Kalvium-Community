@@ -19,30 +19,36 @@ class MobileDrawer extends StatelessWidget {
     final profile = appNavItems.firstWhere((item) => item.isAccountSection);
     return Drawer(
       backgroundColor: Colors.white,
-      child: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              color: AppColors.primary,
-              padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
-              child: const Row(
-                children: [
-                  _DrawerLogoMark(),
-                  SizedBox(width: 12),
-                  Text(
-                    'VetBridge',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w800,
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            color: AppColors.primary,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+                child: const Row(
+                  children: [
+                    _DrawerLogoMark(),
+                    SizedBox(width: 12),
+                    Text(
+                      'VetBridge',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 14),
-            Expanded(
+          ),
+          const SizedBox(height: 14),
+          Expanded(
+            child: SafeArea(
+              top: false,
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 children: [
@@ -60,8 +66,8 @@ class MobileDrawer extends StatelessWidget {
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

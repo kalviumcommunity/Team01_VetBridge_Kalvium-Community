@@ -21,26 +21,26 @@ class AuthSplitShell extends StatelessWidget {
     final split = width >= 1024;
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: split
-            ? Row(
+      body: split
+          ? SafeArea(
+              child: Row(
                 children: [
                   Expanded(flex: 5, child: _BrandPanel(headline: headline, description: description)),
                   Expanded(flex: 6, child: _FormArea(child: formChild)),
                 ],
-              )
-            : Column(
-                children: [
-                  if (compact) const _CompactBrandHeader(),
-                  if (!compact)
-                    SizedBox(
-                      height: 190,
-                      child: _BrandPanel(headline: headline, description: description),
-                    ),
-                  Expanded(child: _FormArea(child: formChild)),
-                ],
               ),
-      ),
+            )
+          : Column(
+              children: [
+                if (compact) const _CompactBrandHeader(),
+                if (!compact)
+                  SizedBox(
+                    height: 190,
+                    child: _BrandPanel(headline: headline, description: description),
+                  ),
+                Expanded(child: _FormArea(child: formChild)),
+              ],
+            ),
     );
   }
 }
@@ -54,10 +54,13 @@ class _FormArea extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: Colors.white,
-      child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-          child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420), child: child),
+      child: SafeArea(
+        top: false,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+            child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420), child: child),
+          ),
         ),
       ),
     );
@@ -74,22 +77,28 @@ class _BrandPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.tealDark,
-      padding: const EdgeInsets.all(48),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _BrandMark(),
-          const Spacer(),
-          Text(headline, style: const TextStyle(color: Colors.white, fontSize: 38, fontWeight: FontWeight.w800, height: 1.1)),
-          const SizedBox(height: 16),
-          Text(description, style: TextStyle(color: Colors.white.withValues(alpha: .78), fontSize: 16, height: 1.5)),
-          const SizedBox(height: 28),
-          const _Feature(icon: Icons.account_tree_outlined, text: 'Multi-branch records'),
-          const _Feature(icon: Icons.assignment_outlined, text: 'Complete history per patient'),
-          const _Feature(icon: Icons.notifications_active_outlined, text: 'Smart follow-up & vaccination alerts'),
-          const Spacer(),
-          Text('© 2026 VetBridge. Care connected.', style: TextStyle(color: Colors.white.withValues(alpha: .55), fontSize: 12)),
-        ],
+      child: SafeArea(
+        bottom: false,
+        right: false,
+        child: Padding(
+          padding: const EdgeInsets.all(48),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _BrandMark(),
+              const Spacer(),
+              Text(headline, style: const TextStyle(color: Colors.white, fontSize: 38, fontWeight: FontWeight.w800, height: 1.1)),
+              const SizedBox(height: 16),
+              Text(description, style: TextStyle(color: Colors.white.withValues(alpha: .78), fontSize: 16, height: 1.5)),
+              const SizedBox(height: 28),
+              const _Feature(icon: Icons.account_tree_outlined, text: 'Multi-branch records'),
+              const _Feature(icon: Icons.assignment_outlined, text: 'Complete history per patient'),
+              const _Feature(icon: Icons.notifications_active_outlined, text: 'Smart follow-up & vaccination alerts'),
+              const Spacer(),
+              Text('© 2026 VetBridge. Care connected.', style: TextStyle(color: Colors.white.withValues(alpha: .55), fontSize: 12)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -103,8 +112,13 @@ class _CompactBrandHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       color: AppColors.tealDark,
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-      child: const _BrandMark(),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+          child: const _BrandMark(),
+        ),
+      ),
     );
   }
 }
