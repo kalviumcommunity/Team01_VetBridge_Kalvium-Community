@@ -110,7 +110,9 @@ class _AppShellState extends State<AppShell> {
     return Container(
       width: double.infinity,
       color: AppColors.background,
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      // No padding here — each screen owns its own scroll area and padding.
+      // Adding padding at this level would double-pad screens like PetsScreen
+      // and cause SingleChildScrollView extent mismatches on mobile.
       child: _sectionPlaceholder(),
     );
   }

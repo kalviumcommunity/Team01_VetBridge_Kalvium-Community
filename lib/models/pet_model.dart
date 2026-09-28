@@ -163,18 +163,39 @@ class Pet {
   final PetStatus status;
 
   factory Pet.fromMap(Map<String, dynamic> map) {
-    DateTime parseDate(dynamic value) => value is DateTime
-        ? value
-        : DateTime.tryParse(value as String? ?? '') ?? DateTime.now();
-    DateTime? parseOptionalDate(dynamic value) =>
-        value == null ? null : parseDate(value);
+    // Safely converts Firestore Timestamp, DateTime, String, or null to DateTime.
+    // Using `value as String?` would throw a TypeError on a Timestamp object.
+    DateTime asDateTime(dynamic value, DateTime fallback) {
+      if (value == null) return fallback;
+      if (value is DateTime) return value;
+      // Firestore Timestamp — use duck-typing to avoid importing firebase_core here.
+      try {
+        final dt = (value as dynamic).toDate();
+        if (dt is DateTime) return dt;
+      } catch (_) {}
+      // String ISO-8601 fallback
+      if (value is String) return DateTime.tryParse(value) ?? fallback;
+      return fallback;
+    }
+
+    DateTime? asOptionalDateTime(dynamic value) {
+      if (value == null) return null;
+      if (value is DateTime) return value;
+      try {
+        final dt = (value as dynamic).toDate();
+        if (dt is DateTime) return dt;
+      } catch (_) {}
+      if (value is String) return DateTime.tryParse(value);
+      return null;
+    }
+
     return Pet(
       id: map['id'] as String? ?? '',
       name: map['name'] as String? ?? '',
       species: map['species'] as String? ?? 'Other',
       breed: map['breed'] as String? ?? '',
       gender: map['gender'] as String? ?? '',
-      dateOfBirth: parseDate(map['dateOfBirth']),
+      dateOfBirth: asDateTime(map['dateOfBirth'], DateTime(2000)),
       color: map['color'] as String? ?? '',
       weightKg: (map['weightKg'] as num?)?.toDouble(),
       microchipId: map['microchipId'] as String?,
@@ -183,9 +204,9 @@ class Pet {
       ownerEmail: map['ownerEmail'] as String?,
       ownerAddress: map['ownerAddress'] as String?,
       currentBranch: map['currentBranch'] as String? ?? '',
-      lastVisit: parseOptionalDate(map['lastVisit']),
+      lastVisit: asOptionalDateTime(map['lastVisit']),
       status: PetStatus.values.firstWhere(
-        (value) => value.name == map['status'],
+        (s) => s.name == (map['status'] as String? ?? ''),
         orElse: () => PetStatus.active,
       ),
     );

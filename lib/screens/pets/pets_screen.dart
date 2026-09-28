@@ -47,19 +47,25 @@ class _PetsScreenState extends State<PetsScreen> {
       child: StreamBuilder<List<Pet>>(
         stream: PetService.instance.streamPets(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          // Show spinner while connecting or waiting for first event.
+          if (snapshot.connectionState == ConnectionState.waiting ||
+              snapshot.connectionState == ConnectionState.none) {
             return const LoadingWidget(message: 'Loading pets...');
           }
+          // Show a readable error — never a silent white screen.
           if (snapshot.hasError) {
             return Center(
-              child: EmptyState(
-                icon: Icons.error_outline,
-                title: 'Error loading pets',
-                message: snapshot.error.toString(),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: EmptyState(
+                  icon: Icons.error_outline,
+                  title: 'Error loading pets',
+                  message: snapshot.error.toString(),
+                ),
               ),
             );
           }
-          
+
           final allPets = snapshot.data ?? [];
           final filteredPets = _filterPets(allPets);
 
