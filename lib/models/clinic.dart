@@ -50,4 +50,13 @@ class Clinic {
 
     return DateTime.now();
   }
+
+  /// Two [Clinic] instances are equal when they share the same [branchId].
+  /// Prevents DropdownButton identity mismatches when stream rebuilds
+  /// produce new instances of the same clinic.
+  @override
+  bool operator ==(Object other) => other is Clinic && other.branchId == branchId;
+
+  @override
+  int get hashCode => branchId.hashCode;
 }

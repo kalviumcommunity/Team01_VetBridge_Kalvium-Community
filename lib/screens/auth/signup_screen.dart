@@ -165,8 +165,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
               textInputAction: TextInputAction.done,
               autofillHints: const [AutofillHints.newPassword],
               validator: (value) {
-                if (value == null || value.isEmpty)
+                if (value == null || value.isEmpty) {
                   return 'Confirm your password';
+                }
                 return value != _passwordController.text
                     ? 'Passwords do not match'
                     : null;
