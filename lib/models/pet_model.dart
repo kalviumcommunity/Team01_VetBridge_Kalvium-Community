@@ -230,6 +230,15 @@ class Pet {
     'lastVisit': lastVisit?.toIso8601String(),
     'status': status.name,
   };
+
+  /// Two [Pet] instances are equal when they share the same [id].
+  /// This ensures [DropdownButton] can match a stored selection against
+  /// newly rebuilt instances coming from a Firestore stream.
+  @override
+  bool operator ==(Object other) => other is Pet && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 // TODO: Replace this mock list with the Firestore `pets` collection stream.

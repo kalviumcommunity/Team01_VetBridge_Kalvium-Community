@@ -35,6 +35,15 @@ class Branch {
       colorKey: map['colorKey'] ?? 'central',
     );
   }
+
+  /// Two [Branch] instances are equal when they share the same [id].
+  /// Prevents DropdownButton identity mismatches when stream rebuilds
+  /// produce new instances of the same branch.
+  @override
+  bool operator ==(Object other) => other is Branch && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 // TODO: Replace this mock list with a Firestore `branches` collection query.
